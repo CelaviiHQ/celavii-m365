@@ -32,7 +32,7 @@ export function createServer(options: CreateServerOptions): McpServer {
   const server = new McpServer(
     {
       name: 'celavii-m365',
-      version: '0.3.1',
+      version: '0.3.2',
     },
     {
       capabilities: {

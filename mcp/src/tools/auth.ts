@@ -109,7 +109,7 @@ export function registerAuthTools(
     async () => {
       return textResponse(
         [
-          'Celavii M365 MCP Server v0.3.1',
+          'Celavii M365 MCP Server v0.3.2',
           '',
           'An open-source MCP server for Microsoft 365 integration.',
           '',
