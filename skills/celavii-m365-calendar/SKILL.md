@@ -7,11 +7,15 @@ description: "Manage Outlook calendar events via Microsoft Graph API. List event
 
 Manage Outlook calendar events via the celavii-m365 MCP server.
 
-**Prerequisite**: User must be authenticated. If not, use the `authenticate` tool first (see `celavii-m365-setup` skill).
+**Prerequisite**: User must be authenticated. If not, use the `m365_authenticate` tool first (see `celavii-m365-setup` skill).
+
+## Tool Names
+
+All calendar tools use the `m365_` prefix: `m365_list_events`, `m365_create_event`, `m365_accept_event`, `m365_decline_event`, `m365_cancel_event`, `m365_delete_event`.
 
 ## Tools
 
-### list_events
+### m365_list_events
 
 List calendar events within a date range.
 
@@ -31,7 +35,7 @@ List calendar events within a date range.
 - "This month" → set start to first of month, end to last of month
 - Always use ISO 8601 format: `2026-03-30T00:00:00`
 
-### create_event
+### m365_create_event
 
 Create a new calendar event.
 
@@ -58,7 +62,22 @@ Create a new calendar event.
 
 **Returns**: Event ID and web link (URL to open in Outlook).
 
-### accept_event
+**Creating meetings — what to ask the user**:
+
+When a user asks to create a meeting or calendar event, gather the following before creating it. Ask for any missing details:
+
+1. **Subject/title** — What is the meeting about?
+2. **Date and time** — When? (ask for timezone if not already known)
+3. **Duration** — How long? (default to 30 minutes if not specified)
+4. **Attendees** — Who should be invited? (email addresses)
+5. **Microsoft Teams link** — "Would you like to add a Teams meeting link?" (Many users want virtual meetings by default. If yes, set `location` to `"Microsoft Teams Meeting"` and add `"This is a Microsoft Teams meeting."` to the body. Note: the Graph API will auto-generate the Teams join link when `isOnlineMeeting` is detected.)
+6. **Location** — If not a Teams meeting, ask for a physical location or video link
+7. **Description/agenda** — "Any agenda items or notes to include in the invite?"
+8. **Importance** — For critical meetings, note this in the body
+
+**Pro tip**: If the user says "set up a call" or "schedule a meeting", proactively ask about Teams and attendees. Don't create a bare event with just a title and time — the invite should be useful to recipients.
+
+### m365_accept_event
 
 Accept a calendar event invitation.
 
@@ -68,7 +87,7 @@ Accept a calendar event invitation.
 | `comment` | string | No | Optional comment to the organizer. |
 | `send_response` | boolean | No | Send response to organizer. Defaults to true. |
 
-### decline_event
+### m365_decline_event
 
 Decline a calendar event invitation.
 
@@ -78,7 +97,7 @@ Decline a calendar event invitation.
 | `comment` | string | No | Optional reason for declining. |
 | `send_response` | boolean | No | Send response to organizer. Defaults to true. |
 
-### cancel_event
+### m365_cancel_event
 
 Cancel a calendar event you organized. Notifies all attendees.
 
@@ -89,7 +108,7 @@ Cancel a calendar event you organized. Notifies all attendees.
 
 **Important**: Only works for events where the user is the **organizer**. Use `decline_event` for events organized by others.
 
-### delete_event
+### m365_delete_event
 
 Permanently delete a calendar event.
 
@@ -97,28 +116,30 @@ Permanently delete a calendar event.
 |-----------|------|----------|-------------|
 | `id` | string | Yes | The event ID to delete. |
 
-**Warning**: This is permanent. Unlike cancel, this does NOT notify attendees. Use `cancel_event` to properly cancel meetings with attendees.
+**Warning**: This is permanent. Unlike cancel, this does NOT notify attendees. Use `m365_cancel_event` to properly cancel meetings with attendees.
 
 ## Common Workflows
 
 ### Check today's schedule
-1. `list_events` with today's date range
-2. Present events in chronological order
+1. `m365_list_events` with today's date range
+2. Present events in chronological order with timezone info
 
 ### Schedule a meeting
 1. Ask user for: subject, date/time, duration, attendees, timezone
-2. Calculate end time from start + duration
-3. `create_event` with all details
-4. Share the event link with the user
+2. Ask: "Would you like to add a Microsoft Teams meeting link?"
+3. Ask: "Any agenda or notes to include in the invite?"
+4. Calculate end time from start + duration
+5. `m365_create_event` with all details (include Teams location and body notes if requested)
+6. Share the event link with the user
 
 ### Respond to invitations
-1. `list_events` to see upcoming events
+1. `m365_list_events` to see upcoming events
 2. Identify events needing response (check response status)
-3. `accept_event` or `decline_event` with optional comment
+3. `m365_accept_event` or `m365_decline_event` with optional comment
 
 ### Cancel a meeting
 1. Confirm the event details with user
-2. `cancel_event` with an explanatory comment
+2. `m365_cancel_event` with an explanatory comment
 3. Attendees are notified automatically
 
 ## Event Display Format
@@ -140,10 +161,10 @@ Attendee response statuses: `accepted`, `declined`, `tentativelyAccepted`, `none
 
 ## Notes
 
-- Event IDs are long opaque strings — always get them from `list_events`
+- Event IDs are long opaque strings — always get them from `m365_list_events`
 - The `calendarView` endpoint is used (not `/events`), so recurring events are expanded
 - Events are sorted by `start/dateTime asc` (chronological)
 - Maximum 50 events per request
 - There is no "update event" tool yet — to reschedule, delete and recreate
 - There is no reply/forward for events — attendees are set at creation time
-- If an event tool returns "Not authenticated", use the `authenticate` tool first
+- If an event tool returns "Not authenticated", use the `m365_authenticate` tool first

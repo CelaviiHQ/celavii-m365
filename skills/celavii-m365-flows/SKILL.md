@@ -24,7 +24,7 @@ Organization
 
 ## Tools
 
-### flow_list_environments
+### m365_flow_list_environments
 
 List available Power Platform environments. This is always the **first step**.
 
@@ -36,17 +36,17 @@ List available Power Platform environments. This is always the **first step**.
 
 Most organizations have a "Default" environment. The environment ID (in the `name` field) looks like: `Default-xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx`
 
-### flow_list
+### m365_flow_list
 
 List flows in a specific environment.
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
-| `environment_id` | string | Yes | The environment ID from `flow_list_environments`. |
+| `environment_id` | string | Yes | The environment ID from `m365_flow_list_environments`. |
 
 **Returns per flow**: Display name, state (Started/Stopped), last modified date, and flow ID.
 
-### flow_run
+### m365_flow_run
 
 Manually trigger a flow.
 
@@ -60,7 +60,7 @@ Manually trigger a flow.
 
 **Inputs**: If the flow's manual trigger accepts input parameters, pass them as a JSON object. The structure depends on how the flow was designed.
 
-### flow_list_runs
+### m365_flow_list_runs
 
 Get execution history for a flow.
 
@@ -74,7 +74,7 @@ Get execution history for a flow.
 
 Use this to check if a flow ran successfully after triggering it, or to debug failed flows.
 
-### flow_toggle
+### m365_flow_toggle
 
 Enable or disable a flow.
 
@@ -92,26 +92,26 @@ Enable or disable a flow.
 ## Common Workflows
 
 ### Check flow status
-1. `flow_list_environments` → get the default environment ID
-2. `flow_list` → see all flows and their states
-3. `flow_list_runs` for a specific flow → check recent execution history
+1. `m365_flow_list_environments` → get the default environment ID
+2. `m365_flow_list` → see all flows and their states
+3. `m365_flow_list_runs` for a specific flow → check recent execution history
 
 ### Trigger a flow manually
-1. `flow_list_environments` → get environment ID
-2. `flow_list` → find the flow and get its ID
-3. `flow_run` → trigger the flow (with optional inputs)
-4. Wait a moment, then `flow_list_runs` → verify it succeeded
+1. `m365_flow_list_environments` → get environment ID
+2. `m365_flow_list` → find the flow and get its ID
+3. `m365_flow_run` → trigger the flow (with optional inputs)
+4. Wait a moment, then `m365_flow_list_runs` → verify it succeeded
 
 ### Troubleshoot a failing flow
-1. `flow_list_environments` → get environment ID
-2. `flow_list_runs` for the problematic flow
+1. `m365_flow_list_environments` → get environment ID
+2. `m365_flow_list_runs` for the problematic flow
 3. Look for `Failed` status entries and their timestamps
 4. Check the trigger name and timing patterns
 
 ### Emergency disable
-1. `flow_list_environments` → get environment ID
-2. `flow_toggle` with `enabled: false` → immediately stops the flow
-3. After fixing the issue, `flow_toggle` with `enabled: true` to re-enable
+1. `m365_flow_list_environments` → get environment ID
+2. `m365_flow_toggle` with `enabled: false` → immediately stops the flow
+3. After fixing the issue, `m365_flow_toggle` with `enabled: true` to re-enable
 
 ## API Details
 
@@ -124,11 +124,11 @@ This means Flow tokens are separate from Graph API tokens. Both are stored in th
 
 ## Notes
 
-- Always start with `flow_list_environments` to get the environment ID — you can't skip this step
+- Always start with `m365_flow_list_environments` to get the environment ID — you can't skip this step
 - Environment IDs look like GUIDs: `Default-xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx`
 - Flow IDs are also GUIDs: `xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx`
-- Only manually-triggered flows can be run via `flow_run`
-- Flow execution is asynchronous — `flow_run` returns immediately, use `flow_list_runs` to check status
+- Only manually-triggered flows can be run via `m365_flow_run`
+- Flow execution is asynchronous — `m365_flow_run` returns immediately, use `m365_flow_list_runs` to check status
 - Run history shows most recent runs first
 - `Succeeded`, `Failed`, `Running`, and `Cancelled` are the possible run statuses
 - Power Automate may not be available in all Microsoft 365 plans

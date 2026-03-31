@@ -28,14 +28,14 @@ The celavii-m365 MCP server connects to Microsoft 365 via OAuth 2.0 using the Mi
 
 ### Step 1: Check auth status
 
-Use the `check_auth_status` tool to see if the user is already authenticated.
+Use the `m365_check_auth_status` tool to see if the user is already authenticated.
 
 ### Step 2: Authenticate (if needed)
 
 Two options:
 
 **Option A — authenticate tool:**
-1. Call the `authenticate` tool — it returns an OAuth URL
+1. Call the `m365_authenticate` tool — it returns an OAuth URL
 2. User visits the URL in their browser
 3. User signs in with their Microsoft account
 4. The auth server (running separately) handles the callback and stores tokens
@@ -47,7 +47,7 @@ Two options:
 
 ### Step 3: Verify
 
-Call `check_auth_status` again to confirm tokens are valid.
+Call `m365_check_auth_status` again to confirm tokens are valid.
 
 ## Token Storage
 
@@ -55,7 +55,7 @@ Call `check_auth_status` again to confirm tokens are valid.
 - File permissions: `0600` (owner read/write only)
 - Contains both Graph API tokens and Flow API tokens (if authenticated)
 - Tokens auto-refresh when expired (5-minute buffer before expiry)
-- Call `logout` tool to clear all tokens
+- Call `m365_logout` tool to clear all tokens
 
 ## Token Structure
 
@@ -80,14 +80,14 @@ The Azure AD app registration needs these **delegated** permissions:
 
 | Permission | Used by |
 |-----------|---------|
-| `Mail.Read` | list_emails, search_emails, read_email |
-| `Mail.ReadWrite` | mark_as_read, move_emails, draft_email |
-| `Mail.Send` | send_email |
+| `Mail.Read` | m365_list_emails, m365_search_emails, m365_read_email |
+| `Mail.ReadWrite` | m365_mark_as_read, m365_move_emails, m365_draft_email |
+| `Mail.Send` | m365_send_email |
 | `User.Read` | Authentication verification |
-| `Calendars.Read` | list_events |
-| `Calendars.ReadWrite` | create_event, accept_event, decline_event, cancel_event, delete_event |
-| `Files.Read` | onedrive_list, onedrive_search, onedrive_download |
-| `Files.ReadWrite` | onedrive_upload, onedrive_share, onedrive_create_folder, onedrive_delete |
+| `Calendars.Read` | m365_list_events |
+| `Calendars.ReadWrite` | m365_create_event, m365_accept_event, m365_decline_event, m365_cancel_event, m365_delete_event |
+| `Files.Read` | m365_onedrive_list, m365_onedrive_search, m365_onedrive_download |
+| `Files.ReadWrite` | m365_onedrive_upload, m365_onedrive_share, m365_onedrive_create_folder, m365_onedrive_delete |
 
 Power Automate tools require a separate scope: `https://service.flow.microsoft.com/.default`
 
@@ -131,21 +131,21 @@ Power Automate tools require a separate scope: `https://service.flow.microsoft.c
 ### Token refresh failed
 
 **Cause**: Refresh token expired (usually after 90 days of inactivity) or was revoked.
-**Fix**: Call `logout` to clear stored tokens, then re-authenticate.
+**Fix**: Call `m365_logout` to clear stored tokens, then re-authenticate.
 
 ### Not authenticated error on tool calls
 
 **Cause**: No tokens stored, or tokens are expired and refresh failed.
-**Fix**: Call `authenticate` tool and complete the OAuth flow.
+**Fix**: Call `m365_authenticate` tool and complete the OAuth flow.
 
 ## Available Auth Tools
 
 | Tool | Description |
 |------|-------------|
-| `authenticate` | Start OAuth flow, returns URL for browser |
-| `check_auth_status` | Verify if tokens exist and are valid |
-| `logout` | Clear all stored tokens |
-| `about` | Server version and capabilities info |
+| `m365_authenticate` | Start OAuth flow, returns URL for browser |
+| `m365_check_auth_status` | Verify if tokens exist and are valid |
+| `m365_logout` | Clear all stored tokens |
+| `m365_about` | Server version and capabilities info |
 
 ## Notes
 

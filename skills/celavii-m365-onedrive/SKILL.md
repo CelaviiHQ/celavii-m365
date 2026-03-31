@@ -7,11 +7,11 @@ description: "Browse, search, upload, download, and share files in OneDrive via 
 
 Browse, search, upload, download, and share OneDrive files via the celavii-m365 MCP server.
 
-**Prerequisite**: User must be authenticated. If not, use the `authenticate` tool first (see `celavii-m365-setup` skill).
+**Prerequisite**: User must be authenticated. If not, use the `m365_authenticate` tool first (see `celavii-m365-setup` skill).
 
 ## Tools
 
-### onedrive_list
+### m365_onedrive_list
 
 List files and folders at a path in OneDrive.
 
@@ -24,7 +24,7 @@ List files and folders at a path in OneDrive.
 
 **Returns per item**: Type (folder/file), name, size (human-readable), last modified date, web URL, and item ID.
 
-### onedrive_search
+### m365_onedrive_search
 
 Search for files and folders by name or content.
 
@@ -35,7 +35,7 @@ Search for files and folders by name or content.
 
 **How search works**: Microsoft Graph's search indexes both file names and file contents (for supported formats like Word, Excel, PDF, text files). Results include files from anywhere in the user's OneDrive.
 
-### onedrive_download
+### m365_onedrive_download
 
 Get a temporary, pre-authenticated download URL for a file.
 
@@ -47,7 +47,7 @@ Get a temporary, pre-authenticated download URL for a file.
 
 **Note**: This returns a URL — it does not download the file contents into the conversation. The user needs to open the URL in a browser or use it in another tool.
 
-### onedrive_upload
+### m365_onedrive_upload
 
 Upload a file to OneDrive.
 
@@ -70,7 +70,7 @@ Upload a file to OneDrive.
 
 **Conflict behavior**: If a file already exists at the path, it will be **overwritten**.
 
-### onedrive_share
+### m365_onedrive_share
 
 Create a sharing link for a file or folder.
 
@@ -91,7 +91,7 @@ Create a sharing link for a file or folder.
 
 **Note**: Organization policies may restrict anonymous sharing. If it fails, try `organization` scope.
 
-### onedrive_create_folder
+### m365_onedrive_create_folder
 
 Create a new folder in OneDrive.
 
@@ -102,7 +102,7 @@ Create a new folder in OneDrive.
 
 **Conflict behavior**: If a folder with the same name exists, it will be automatically renamed (e.g., `Reports 1`).
 
-### onedrive_delete
+### m365_onedrive_delete
 
 Permanently delete a file or folder from OneDrive.
 
@@ -115,29 +115,29 @@ Permanently delete a file or folder from OneDrive.
 ## Common Workflows
 
 ### Browse files
-1. `onedrive_list` with no path to see root contents
-2. `onedrive_list` with a path to drill into folders
+1. `m365_onedrive_list` with no path to see root contents
+2. `m365_onedrive_list` with a path to drill into folders
 3. Continue navigating by path
 
 ### Find a file
-1. `onedrive_search` with the file name or content keywords
-2. `onedrive_download` to get a download link
-3. Or `onedrive_share` to create a sharing link
+1. `m365_onedrive_search` with the file name or content keywords
+2. `m365_onedrive_download` to get a download link
+3. Or `m365_onedrive_share` to create a sharing link
 
 ### Upload a document
 1. Ask user for the file content and destination path
-2. `onedrive_upload` with path and content
-3. Optionally `onedrive_share` to create a link
+2. `m365_onedrive_upload` with path and content
+3. Optionally `m365_onedrive_share` to create a link
 
 ### Share a file
-1. Find the file via `onedrive_list` or `onedrive_search`
-2. `onedrive_share` with the item ID
+1. Find the file via `m365_onedrive_list` or `m365_onedrive_search`
+2. `m365_onedrive_share` with the item ID
 3. Return the sharing URL to the user
 
 ### Organize files
-1. `onedrive_create_folder` to create folder structure
+1. `m365_onedrive_create_folder` to create folder structure
 2. Upload files to the new folders
-3. Delete old/unwanted files with `onedrive_delete`
+3. Delete old/unwanted files with `m365_onedrive_delete`
 
 ## Item Display Format
 
@@ -158,10 +158,10 @@ Items are formatted as:
 
 ## Notes
 
-- Item IDs are required for download, share, and delete operations — get them from `onedrive_list` or `onedrive_search`
+- Item IDs are required for download, share, and delete operations — get them from `m365_onedrive_list` or `m365_onedrive_search`
 - Paths always start with `/` from the OneDrive root
 - File sizes are displayed in human-readable format (B, KB, MB, GB, TB)
 - Items are sorted alphabetically by name when listing
 - Search results may include items from anywhere in OneDrive, not just the current folder
 - Upload is limited to text/base64 content that fits in a single request (< 4MB)
-- If any tool returns "Not authenticated", use the `authenticate` tool first
+- If any tool returns "Not authenticated", use the `m365_authenticate` tool first

@@ -7,11 +7,11 @@ description: "Read, search, send, draft, and manage Outlook emails via Microsoft
 
 Read, search, send, and manage Outlook emails via the celavii-m365 MCP server.
 
-**Prerequisite**: User must be authenticated. If not, use the `authenticate` tool first (see `celavii-m365-setup` skill).
+**Prerequisite**: User must be authenticated. If not, use the `m365_authenticate` tool first (see `celavii-m365-setup` skill).
 
 ## Tools
 
-### list_emails
+### m365_list_emails
 
 List emails from a mailbox folder.
 
@@ -29,11 +29,11 @@ These are aliases that map to Microsoft Graph well-known folder names:
 - `deleted` / `trash` -> `deleteditems`
 - `junk` / `spam` -> `junkemail`
 
-You can also pass a folder ID (from `list_folders`) for custom folders.
+You can also pass a folder ID (from `m365_list_folders`) for custom folders.
 
 **Returns**: Subject, sender, date, preview (150 chars), read status, attachment flag, importance, and message ID.
 
-### search_emails
+### m365_search_emails
 
 Search emails with multiple filters.
 
@@ -59,7 +59,7 @@ Search emails with multiple filters.
 - "Unread emails with attachments" → `{ unread_only: true, has_attachments: true }`
 - "Emails about the project from Sarah" → `{ query: "project", from: "sarah@company.com" }`
 
-### read_email
+### m365_read_email
 
 Read the full content of a specific email.
 
@@ -74,7 +74,7 @@ The `include_raw_html` flag adds the original HTML alongside the sanitized text.
 
 **Returns**: Subject, from, to, CC, date, importance, attachment status, read status, and the full body text.
 
-### send_email
+### m365_send_email
 
 Compose and send an email.
 
@@ -91,7 +91,7 @@ Compose and send an email.
 
 **Important**: Always confirm with the user before sending emails. Read back the recipient(s), subject, and body for confirmation.
 
-### draft_email
+### m365_draft_email
 
 Create a draft email without sending it. Saved to the Drafts folder.
 
@@ -105,7 +105,7 @@ Create a draft email without sending it. Saved to the Drafts folder.
 
 **Returns**: The draft message ID (can be used to send later via Graph API).
 
-### mark_as_read
+### m365_mark_as_read
 
 Mark one or more emails as read or unread.
 
@@ -119,32 +119,32 @@ Mark one or more emails as read or unread.
 ## Common Workflows
 
 ### Check new mail
-1. `list_emails` with `unread_only: true`
-2. `read_email` for any email the user wants to see
-3. Optionally `mark_as_read` after reading
+1. `m365_list_emails` with `unread_only: true`
+2. `m365_read_email` for any email the user wants to see
+3. Optionally `m365_mark_as_read` after reading
 
 ### Search and respond
-1. `search_emails` with filters
-2. `read_email` to read the full message
-3. `send_email` to reply (manually construct the reply — no reply-to-thread support yet)
+1. `m365_search_emails` with filters
+2. `m365_read_email` to read the full message
+3. `m365_send_email` to reply (manually construct the reply — no reply-to-thread support yet)
 
 ### Draft review workflow
-1. `draft_email` to create the draft
+1. `m365_draft_email` to create the draft
 2. User reviews in Outlook
 3. User sends from Outlook when ready
 
 ## Pagination
 
-- `list_emails` supports `skip` for offset-based pagination
+- `m365_list_emails` supports `skip` for offset-based pagination
 - Results are always sorted by `receivedDateTime desc` (newest first)
 - Maximum 50 emails per request
 - For large mailboxes, use `skip` to page through: first call `skip: 0`, then `skip: 25`, then `skip: 50`, etc.
 
 ## Notes
 
-- Email IDs are long opaque strings — always get them from `list_emails` or `search_emails`
+- Email IDs are long opaque strings — always get them from `m365_list_emails` or `m365_search_emails`
 - The `bodyPreview` in list results is truncated to 150 characters
 - Importance flags: emails marked `high` show `[HIGH]`, `low` show `[LOW]` in formatted output
 - Unread emails show `[UNREAD]` flag, emails with attachments show `[ATTACHMENTS]`
 - All tool responses are text-formatted for readability, not raw JSON
-- If any email tool returns "Not authenticated", use the `authenticate` tool first
+- If any email tool returns "Not authenticated", use the `m365_authenticate` tool first

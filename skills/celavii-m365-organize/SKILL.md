@@ -7,11 +7,11 @@ description: "Organize Outlook mail with folders, rules, and email moves. Create
 
 Organize Outlook mail with folders, rules, and batch email moves via the celavii-m365 MCP server.
 
-**Prerequisite**: User must be authenticated. If not, use the `authenticate` tool first (see `celavii-m365-setup` skill).
+**Prerequisite**: User must be authenticated. If not, use the `m365_authenticate` tool first (see `celavii-m365-setup` skill).
 
 ## Folder Tools
 
-### list_folders
+### m365_list_folders
 
 List all mail folders with item and unread counts.
 
@@ -21,7 +21,7 @@ List all mail folders with item and unread counts.
 
 **Returns per folder**: Display name, total items, unread items, sub-folder count, and folder ID.
 
-### create_folder
+### m365_create_folder
 
 Create a new mail folder.
 
@@ -32,7 +32,7 @@ Create a new mail folder.
 
 **Nesting**: You can create sub-folders by specifying a parent. For example, create "Q1" inside "Projects" by setting `parent_folder: "Projects"` (use the folder ID if "Projects" is a custom folder).
 
-### move_emails
+### m365_move_emails
 
 Move one or more emails to a destination folder.
 
@@ -49,7 +49,7 @@ These are automatically resolved to the correct folder ID before moving.
 
 ## Rule Tools
 
-### list_rules
+### m365_list_rules
 
 List all inbox rules.
 
@@ -62,7 +62,7 @@ List all inbox rules.
 
 Rules are sorted by sequence number (lower = runs first).
 
-### create_rule
+### m365_create_rule
 
 Create a new inbox rule.
 
@@ -77,15 +77,15 @@ Create a new inbox rule.
 | `mark_as_read` | boolean | No | Mark matching emails as read. |
 | `stop_processing` | boolean | No | Stop processing additional rules. Defaults to false. |
 
-**Important**: `move_to_folder` requires a **folder ID**, not a folder name. Use `list_folders` first to get the ID.
+**Important**: `move_to_folder` requires a **folder ID**, not a folder name. Use `m365_list_folders` first to get the ID.
 
 **Conditions**: Multiple conditions are combined with AND logic — all conditions must match for the rule to trigger.
 
 **Typical rule creation workflow**:
-1. `list_folders` — get the folder ID for the destination
-2. `create_rule` — set conditions and actions
+1. `m365_list_folders` — get the folder ID for the destination
+2. `m365_create_rule` — set conditions and actions
 
-### update_rule_sequence
+### m365_update_rule_sequence
 
 Change the execution order of a rule.
 
@@ -96,7 +96,7 @@ Change the execution order of a rule.
 
 Rules run in sequence order. Lower numbers execute first. Use this to prioritize important rules.
 
-### delete_rule
+### m365_delete_rule
 
 Delete an inbox rule.
 
@@ -107,22 +107,22 @@ Delete an inbox rule.
 ## Common Workflows
 
 ### Organize existing emails
-1. `list_folders` to see current folder structure
-2. `create_folder` for any new folders needed
-3. `search_emails` (from email skill) to find emails to organize
-4. `move_emails` to move them to the right folders
+1. `m365_list_folders` to see current folder structure
+2. `m365_create_folder` for any new folders needed
+3. `m365_search_emails` (from email skill) to find emails to organize
+4. `m365_move_emails` to move them to the right folders
 
 ### Set up auto-sorting
-1. `list_folders` to get the destination folder ID
-2. `create_rule` with conditions and `move_to_folder` action
+1. `m365_list_folders` to get the destination folder ID
+2. `m365_create_rule` with conditions and `move_to_folder` action
 3. Optionally set `mark_as_read: true` for low-priority rules
-4. `list_rules` to verify the rule was created
+4. `m365_list_rules` to verify the rule was created
 
 ### Example: Auto-sort GitHub notifications
 ```
-Step 1: create_folder({ name: "GitHub" })
-Step 2: list_folders() → get the ID of the "GitHub" folder
-Step 3: create_rule({
+Step 1: m365_create_folder({ name: "GitHub" })
+Step 2: m365_list_folders() → get the ID of the "GitHub" folder
+Step 3: m365_create_rule({
   name: "GitHub Notifications",
   from_addresses: ["notifications@github.com"],
   move_to_folder: "<folder-id-from-step-2>",
@@ -132,7 +132,7 @@ Step 3: create_rule({
 
 ### Example: Flag important client emails
 ```
-create_rule({
+m365_create_rule({
   name: "VIP Client Alerts",
   from_addresses: ["ceo@bigclient.com", "pm@bigclient.com"],
   stop_processing: true
@@ -141,8 +141,8 @@ create_rule({
 Note: This rule just matches — without a move action, it stops other rules from processing, keeping the email in the inbox.
 
 ### Reorder rules for priority
-1. `list_rules` to see current sequence
-2. `update_rule_sequence` to change order
+1. `m365_list_rules` to see current sequence
+2. `m365_update_rule_sequence` to change order
 3. Lower sequence = higher priority (runs first)
 
 ## Well-Known Folder Name Mapping
@@ -157,14 +157,14 @@ Note: This rule just matches — without a move action, it stops other rules fro
 | `archive` | `archive` |
 | `outbox` | `outbox` |
 
-These work in `list_emails`, `search_emails`, `move_emails`, and folder operations.
+These work in `m365_list_emails`, `m365_search_emails`, `m365_move_emails`, and folder operations.
 
 ## Notes
 
-- Folder IDs are required for rule `move_to_folder` — always get them from `list_folders` first
+- Folder IDs are required for rule `move_to_folder` — always get them from `m365_list_folders` first
 - Rules apply to **new incoming emails only** — they don't retroactively process existing emails
-- To apply a rule's logic to existing emails, use `search_emails` + `move_emails` manually
+- To apply a rule's logic to existing emails, use `m365_search_emails` + `m365_move_emails` manually
 - Multiple conditions on a rule use AND logic (all must match)
 - `stop_processing: true` prevents subsequent rules from running on a matching email
-- Maximum 100 folders returned per `list_folders` call
-- If any tool returns "Not authenticated", use the `authenticate` tool first
+- Maximum 100 folders returned per `m365_list_folders` call
+- If any tool returns "Not authenticated", use the `m365_authenticate` tool first
