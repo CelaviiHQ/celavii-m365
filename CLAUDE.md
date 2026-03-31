@@ -5,8 +5,10 @@ Open-source MCP server for Microsoft 365 (Outlook, Calendar, OneDrive, Power Aut
 ## Project Structure
 
 - `mcp/` — TypeScript MCP server (npm package: `celavii-m365`)
-- `plugin/` — IDE plugin configs and skill distribution
-- `skills/` — Agent Skills (source of truth)
+- `skills/` — Agent Skills (source of truth, shared across all IDEs)
+- `.claude-plugin/` — Claude Code plugin manifest
+- `.mcp.json` — MCP server config (used by plugin auto-install)
+- `install.sh` — Cross-IDE installer (Claude Code, Windsurf, Cursor)
 
 ## Development
 

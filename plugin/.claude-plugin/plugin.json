@@ -1,8 +1,0 @@
-{
-  "name": "celavii-m365",
-  "version": "0.1.0",
-  "description": "Microsoft 365 MCP Server — Email, Calendar, OneDrive, and Power Automate integration for AI-powered IDEs",
-  "author": {
-    "name": "Celavii"
-  }
-}

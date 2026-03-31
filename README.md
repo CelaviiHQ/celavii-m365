@@ -32,34 +32,51 @@ An open-source [MCP](https://modelcontextprotocol.io) server that connects Micro
    - `Files.Read`, `Files.ReadWrite`
 7. Click **Grant admin consent** (or have an admin do it)
 
-### 2. Add to Your IDE
+### 2. Install the Plugin
+
+Choose the method that works best for your setup:
 
 <details>
-<summary><b>Claude Code / Claude Desktop</b></summary>
+<summary><b>Option A: Claude Code Plugin Install (Recommended)</b></summary>
 
-Add to your MCP settings (`~/.claude/settings.json` or Claude Desktop config):
-
-```json
-{
-  "mcpServers": {
-    "celavii-m365": {
-      "command": "npx",
-      "args": ["-y", "celavii-m365"],
-      "env": {
-        "M365_CLIENT_ID": "your-client-id",
-        "M365_CLIENT_SECRET": "your-client-secret-value",
-        "M365_TENANT_ID": "your-tenant-id"
-      }
-    }
-  }
-}
+```bash
+claude plugin install --from github:CelaviiHQ/celavii-m365
 ```
+
+This auto-installs the MCP server, skills, and configuration. After installing, set your Azure AD credentials:
+
+1. Open your project's `.mcp.json`
+2. Fill in `M365_CLIENT_ID`, `M365_CLIENT_SECRET`, and `M365_TENANT_ID`
+3. Restart Claude Code
+
 </details>
 
 <details>
-<summary><b>Windsurf / Cursor / Cline</b></summary>
+<summary><b>Option B: Cross-IDE Installer Script</b></summary>
 
-Add to your MCP config (`.mcp.json` or IDE-specific config):
+Clone the repo and run the installer:
+
+```bash
+git clone https://github.com/CelaviiHQ/celavii-m365.git
+cd celavii-m365
+
+# Install for all IDEs (Claude Code, Windsurf, Cursor)
+./install.sh all --project-dir /path/to/your/project
+
+# Or install for a specific IDE
+./install.sh claude --project-dir /path/to/your/project
+./install.sh windsurf --project-dir /path/to/your/project
+./install.sh cursor --project-dir /path/to/your/project
+```
+
+Then set your Azure AD credentials in the generated `.mcp.json`.
+
+</details>
+
+<details>
+<summary><b>Option C: Manual MCP Configuration</b></summary>
+
+Add to your IDE's MCP config (`.mcp.json`, `settings.json`, or Claude Desktop config):
 
 ```json
 {
@@ -76,6 +93,12 @@ Add to your MCP config (`.mcp.json` or IDE-specific config):
   }
 }
 ```
+
+For skills (optional but recommended), copy the `skills/` directory from this repo into your project:
+- **Claude Code**: Copy to project root as `skills/`
+- **Windsurf**: Copy to `.windsurf/skills/`
+- **Cursor**: Copy to `.cursor/skills/`
+
 </details>
 
 ### 3. Authenticate
@@ -91,6 +114,28 @@ M365_CLIENT_ID=xxx M365_CLIENT_SECRET=xxx npx celavii-m365-auth
 ```
 
 Then visit `http://localhost:3333/auth` in your browser.
+
+## What Gets Installed
+
+| Component | Description | Location |
+|-----------|-------------|----------|
+| **MCP Server** | 35 Microsoft 365 tools | Runs via `npx celavii-m365` |
+| **Skills** | 6 domain-knowledge guides | `skills/celavii-m365-*` |
+| **Plugin Manifest** | Claude Code plugin metadata | `.claude-plugin/plugin.json` |
+| **MCP Config** | Server connection settings | `.mcp.json` |
+
+### Skills
+
+Skills provide domain knowledge so your AI assistant knows how to use the M365 tools effectively:
+
+| Skill | Description |
+|-------|-------------|
+| `celavii-m365-setup` | Authentication flow, Azure AD setup, troubleshooting |
+| `celavii-m365-email` | Email operations — read, search, send, draft, manage |
+| `celavii-m365-calendar` | Calendar management — events, invitations, timezones |
+| `celavii-m365-onedrive` | OneDrive — browse, upload, download, share files |
+| `celavii-m365-organize` | Mail organization — folders, rules, batch moves |
+| `celavii-m365-flows` | Power Automate — environments, flows, runs, triggers |
 
 ## Environment Variables
 
@@ -189,25 +234,31 @@ Built following the [celavii-toolkit](https://github.com/CelaviiHQ/celavii-toolk
 - **npm publishable** — `npx celavii-m365` just works
 
 ```
-mcp/src/
-  index.ts              Entry point (stdio transport)
-  server.ts             Server factory + tool registration
-  client.ts             GraphClient (Graph API + Flow API)
-  types.ts              Shared types and constants
-  auth-server.ts        OAuth callback server (separate process)
-  auth/
-    token-store.ts      Token persistence + refresh logic
-  tools/
-    auth.ts             4 auth tools
-    email.ts            6 email tools
-    calendar.ts         6 calendar tools
-    folders.ts          3 folder tools
-    onedrive.ts         7 OneDrive tools
-    rules.ts            4 inbox rule tools
-    power-automate.ts   5 Power Automate tools
-  utils/
-    folders.ts          Well-known folder name resolution
-    formatting.ts       Display formatters + MCP response helpers
+celavii-m365/
+  .claude-plugin/       Plugin manifest
+  .mcp.json             MCP server config
+  skills/               Agent Skills (6 domain guides)
+  install.sh            Cross-IDE installer
+  mcp/                  TypeScript MCP server
+    src/
+      index.ts          Entry point (stdio transport)
+      server.ts         Server factory + tool registration
+      client.ts         GraphClient (Graph API + Flow API)
+      types.ts          Shared types and constants
+      auth-server.ts    OAuth callback server (separate process)
+      auth/
+        token-store.ts  Token persistence + refresh logic
+      tools/
+        auth.ts         4 auth tools
+        email.ts        6 email tools
+        calendar.ts     6 calendar tools
+        folders.ts      3 folder tools
+        onedrive.ts     7 OneDrive tools
+        rules.ts        4 inbox rule tools
+        power-automate.ts  5 Power Automate tools
+      utils/
+        folders.ts      Well-known folder name resolution
+        formatting.ts   Display formatters + MCP response helpers
 ```
 
 ## Contributing
