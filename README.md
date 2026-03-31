@@ -65,46 +65,18 @@ The plugin will appear under "Personal plugins" with 6 skills:
 
 ### Step 3: Authenticate with Microsoft 365
 
-<details open>
-<summary><b>Code tab (stdio)</b></summary>
+The same flow works across all Claude Desktop tabs (Code, Cowork, Chat):
 
 1. Start a new chat and ask: *"Authenticate with Microsoft 365"*
-2. Claude will return an OAuth URL — open it in your browser
+2. Claude will return a link to **http://localhost:3333/auth** — open it in your browser
 3. Sign in with your Microsoft account
-4. Done! Tokens are saved locally.
+4. You'll see a success page — return to Claude Desktop and retry your request
 
-**Note:** If credentials are empty, go to **Customize** → **Celavii M365** → **Connectors** and fill in your `M365_CLIENT_ID`, `M365_CLIENT_SECRET`, and `M365_TENANT_ID`.
+The auth server runs embedded inside the MCP server (same process), so there are no CSRF issues.
 
-</details>
+**Note (Code tab):** If credentials are empty, go to **Customize** → **Celavii M365** → **Connectors** and fill in your `M365_CLIENT_ID`, `M365_CLIENT_SECRET`, and `M365_TENANT_ID`.
 
-<details>
-<summary><b>Cowork / Chat tabs (HTTP transport — recommended)</b></summary>
-
-Use the HTTP server for Cowork and Chat. It runs both the MCP server and auth in one process, avoiding the CSRF issues that occur with separate processes.
-
-1. **Start the HTTP server** in a terminal:
-   ```bash
-   M365_CLIENT_ID=your-id M365_CLIENT_SECRET=your-secret M365_TENANT_ID=your-tenant npx celavii-m365-http
-   ```
-2. Open **http://localhost:3333/auth** in your browser
-3. Sign in with your Microsoft account — you'll see a success page
-4. Go back to Claude Desktop — all M365 tools are ready
-
-> **Why HTTP?** Cowork/Chat run in a sandboxed environment. The HTTP server runs locally on your machine and serves both MCP protocol requests and OAuth in one process, so CSRF tokens always match.
-
-</details>
-
-<details>
-<summary><b>Code tab with HTTP transport (optional)</b></summary>
-
-You can also use the HTTP server with the Code tab for a consistent experience:
-
-1. Build the plugin with `--http` flag: `./build-plugin.sh --http`
-2. Install the ZIP in Claude Desktop
-3. Start the HTTP server (see Cowork/Chat instructions above)
-4. All tools work the same way
-
-</details>
+**Note (Cowork/Chat):** Connector settings are read-only. Build the plugin ZIP with credentials: `./build-plugin.sh --client-id YOUR_ID --secret YOUR_SECRET --tenant-id YOUR_TENANT`
 
 ### Step 4: Start Using It
 

@@ -20,7 +20,8 @@ export function registerAuthTools(
       inputSchema: z.object({}),
     },
     async () => {
-      const authUrl = tokenStore.getAuthUrl()
+      const port = process.env.M365_AUTH_PORT || '3333'
+      const authUrl = `http://localhost:${port}/auth`
 
       return textResponse(
         [
@@ -28,8 +29,8 @@ export function registerAuthTools(
           '',
           authUrl,
           '',
-          'After authenticating, the callback will store your tokens automatically.',
-          'Then retry your original request.',
+          'Sign in with your Microsoft 365 account.',
+          'After authenticating, return here and retry your request.',
         ].join('\n'),
       )
     },
@@ -95,7 +96,7 @@ export function registerAuthTools(
     async () => {
       return textResponse(
         [
-          'Celavii M365 MCP Server v0.1.0',
+          'Celavii M365 MCP Server v0.2.0',
           '',
           'An open-source MCP server for Microsoft 365 integration.',
           '',
