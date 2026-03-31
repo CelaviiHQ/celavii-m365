@@ -135,6 +135,13 @@ if [ -n "$HTTP_MODE" ]; then
 EOF
 else
   # Stdio transport — launch process directly
+  # Build env block — only include TOKEN_PATH if explicitly set
+  TOKEN_PATH_LINE=""
+  if [ -n "$TOKEN_PATH" ]; then
+    TOKEN_PATH_LINE=",
+        \"M365_TOKEN_PATH\": \"${TOKEN_PATH}\""
+  fi
+
   cat > "$TMPDIR/.mcp.json" << EOF
 {
   "mcpServers": {
@@ -144,8 +151,7 @@ else
       "env": {
         "M365_CLIENT_ID": "${CLIENT_ID}",
         "M365_CLIENT_SECRET": "${CLIENT_SECRET}",
-        "M365_TENANT_ID": "${TENANT_ID}",
-        "M365_TOKEN_PATH": "${TOKEN_PATH}"
+        "M365_TENANT_ID": "${TENANT_ID}"${TOKEN_PATH_LINE}
       }
     }
   }

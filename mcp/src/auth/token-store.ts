@@ -21,8 +21,6 @@ export class TokenStore {
   private async load(): Promise<void> {
     if (this.loaded) return
 
-    process.stderr.write(`[celavii-m365] load() called — storagePath=${this.storagePath}, exists=${existsSync(this.storagePath)}\n`)
-
     // Support env-based refresh token (for Cowork/Chat where filesystem is sandboxed)
     const envRefreshToken = process.env.M365_REFRESH_TOKEN
     if (envRefreshToken && !this.tokens) {
@@ -83,9 +81,6 @@ export class TokenStore {
     // This allows retrying after the user completes auth and tokens are saved to disk.
     if (this.tokens) {
       this.loaded = true
-      process.stderr.write(`[celavii-m365] load() success — tokens found\n`)
-    } else {
-      process.stderr.write(`[celavii-m365] load() — no tokens found\n`)
     }
   }
 
@@ -185,7 +180,6 @@ export class TokenStore {
 
   async isAuthenticated(): Promise<boolean> {
     await this.load()
-    process.stderr.write(`[celavii-m365] isAuthenticated() — tokens=${this.tokens != null}, graph=${this.tokens?.graph != null}, storagePath=${this.storagePath}\n`)
     return this.tokens?.graph != null
   }
 

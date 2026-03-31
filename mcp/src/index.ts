@@ -39,7 +39,7 @@ async function main() {
   const authPort = parseInt(process.env.M365_AUTH_PORT || '3333', 10)
   const authHost = process.env.M365_AUTH_HOST || 'localhost'
   const redirectUri = process.env.M365_REDIRECT_URI || `http://localhost:${authPort}/auth/callback`
-  const tokenStorePath = process.env.M365_TOKEN_PATH || undefined
+  const tokenStorePath = process.env.M365_TOKEN_PATH || undefined // empty string → undefined → use default
 
   // ─── Shared Token Store ───────────────────────────────────────────────
   // One instance shared between the MCP server tools and the embedded
