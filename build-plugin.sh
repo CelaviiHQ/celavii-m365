@@ -8,10 +8,53 @@ set -euo pipefail
 #   - .claude-plugin/plugin.json  (plugin manifest)
 #   - .mcp.json                   (MCP server config)
 #   - skills/                     (6 Agent Skills)
+#
+# Usage:
+#   ./build-plugin.sh                                    # generic (empty credentials)
+#   ./build-plugin.sh --client-id XXX --secret YYY       # with credentials baked in
+#   ./build-plugin.sh -o my-plugin.zip --client-id XXX   # custom output path
 # ================================================================
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-OUTPUT="${1:-celavii-m365-plugin.zip}"
+OUTPUT=""
+CLIENT_ID=""
+CLIENT_SECRET=""
+TENANT_ID=""
+
+# Parse arguments
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    -o|--output)       OUTPUT="$2"; shift 2 ;;
+    --client-id)       CLIENT_ID="$2"; shift 2 ;;
+    --secret)          CLIENT_SECRET="$2"; shift 2 ;;
+    --tenant-id)       TENANT_ID="$2"; shift 2 ;;
+    -h|--help)
+      echo "Usage: ./build-plugin.sh [options]"
+      echo ""
+      echo "Options:"
+      echo "  -o, --output <file>     Output ZIP path (default: celavii-m365-plugin.zip)"
+      echo "  --client-id <id>        Azure AD Application (client) ID"
+      echo "  --secret <secret>       Azure AD client secret value"
+      echo "  --tenant-id <id>        Azure AD tenant ID (optional)"
+      echo ""
+      echo "Examples:"
+      echo "  ./build-plugin.sh"
+      echo "  ./build-plugin.sh --client-id abc123 --secret xyz789"
+      echo "  ./build-plugin.sh --client-id abc123 --secret xyz789 --tenant-id def456"
+      exit 0
+      ;;
+    *)
+      # Legacy: first positional arg is output path
+      if [ -z "$OUTPUT" ]; then
+        OUTPUT="$1"; shift
+      else
+        echo "Unknown option: $1"; exit 1
+      fi
+      ;;
+  esac
+done
+
+OUTPUT="${OUTPUT:-celavii-m365-plugin.zip}"
 
 # Resolve to absolute path if relative
 case "$OUTPUT" in
@@ -38,10 +81,34 @@ if [ "$SKILL_COUNT" -eq 0 ]; then
   exit 1
 fi
 
+# Build in a temp directory so we can inject credentials
+TMPDIR=$(mktemp -d)
+trap "rm -rf $TMPDIR" EXIT
+
+cp -r .claude-plugin skills "$TMPDIR/"
+
+# Generate .mcp.json with credentials (or empty defaults)
+cat > "$TMPDIR/.mcp.json" << EOF
+{
+  "mcpServers": {
+    "celavii-m365": {
+      "command": "npx",
+      "args": ["-y", "celavii-m365"],
+      "env": {
+        "M365_CLIENT_ID": "${CLIENT_ID}",
+        "M365_CLIENT_SECRET": "${CLIENT_SECRET}",
+        "M365_TENANT_ID": "${TENANT_ID}"
+      }
+    }
+  }
+}
+EOF
+
 # Remove old ZIP if it exists
 rm -f "$OUTPUT"
 
 # Build ZIP
+cd "$TMPDIR"
 zip -r "$OUTPUT" \
   .claude-plugin/ \
   .mcp.json \
@@ -52,8 +119,15 @@ zip -r "$OUTPUT" \
 echo ""
 echo "✅ Plugin ZIP created: $OUTPUT"
 echo "   Skills: $SKILL_COUNT"
+
+if [ -n "$CLIENT_ID" ]; then
+  echo "   Credentials: included"
+else
+  echo "   Credentials: empty (fill in after installing)"
+fi
+
 echo ""
 echo "To install:"
-echo "  1. Open Claude Desktop → Plugins (+ button) → Add plugin"
+echo "  1. Open Claude Desktop → Customize → + (Add plugin)"
 echo "  2. Click 'Browse files' and select this ZIP"
-echo "  3. After installing, set your Azure AD credentials in the MCP config"
+echo "  3. Start a new chat and ask Claude to authenticate with Microsoft 365"

@@ -26,7 +26,17 @@ Connect Microsoft 365 to Claude — read emails, manage your calendar, browse On
 
 ### Step 1: Download the Plugin
 
-Go to the [Releases page](https://github.com/CelaviiHQ/celavii-m365/releases) and download **`celavii-m365-plugin.zip`** from the latest release.
+**Option A** — Download the generic ZIP from the [Releases page](https://github.com/CelaviiHQ/celavii-m365/releases) (you'll configure credentials after installing).
+
+**Option B** — Build a ZIP with your credentials pre-filled (recommended):
+
+```bash
+git clone https://github.com/CelaviiHQ/celavii-m365.git
+cd celavii-m365
+./build-plugin.sh --client-id YOUR_CLIENT_ID --secret YOUR_SECRET --tenant-id YOUR_TENANT_ID
+```
+
+This creates `celavii-m365-plugin.zip` ready to upload with everything configured.
 
 ### Step 2: Install in Claude Desktop
 
