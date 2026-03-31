@@ -37,22 +37,39 @@ An open-source [MCP](https://modelcontextprotocol.io) server that connects Micro
 Choose the method that works best for your setup:
 
 <details>
-<summary><b>Option A: Claude Code Plugin Install (Recommended)</b></summary>
+<summary><b>Option A: Claude Desktop — Plugin Upload (Recommended)</b></summary>
+
+1. Download the latest `celavii-m365-plugin.zip` from [Releases](https://github.com/CelaviiHQ/celavii-m365/releases), or build it yourself:
+   ```bash
+   git clone https://github.com/CelaviiHQ/celavii-m365.git
+   cd celavii-m365
+   ./build-plugin.sh
+   ```
+2. In Claude Desktop, click the **+** button next to the prompt box
+3. Select **Plugins** → **Add plugin**
+4. Click **Browse files** and select `celavii-m365-plugin.zip`
+5. After installing, configure your Azure AD credentials in the MCP settings
+6. Restart Claude Desktop
+
+This installs the MCP server, all 6 skills, and configuration automatically.
+
+</details>
+
+<details>
+<summary><b>Option B: Claude Code CLI</b></summary>
+
+If you have the Claude CLI installed:
 
 ```bash
 claude plugin install --from github:CelaviiHQ/celavii-m365
 ```
 
-This auto-installs the MCP server, skills, and configuration. After installing, set your Azure AD credentials:
-
-1. Open your project's `.mcp.json`
-2. Fill in `M365_CLIENT_ID`, `M365_CLIENT_SECRET`, and `M365_TENANT_ID`
-3. Restart Claude Code
+Then set your Azure AD credentials in your project's `.mcp.json` and restart Claude Code.
 
 </details>
 
 <details>
-<summary><b>Option B: Cross-IDE Installer Script</b></summary>
+<summary><b>Option C: Cross-IDE Installer Script</b></summary>
 
 Clone the repo and run the installer:
 
@@ -74,7 +91,7 @@ Then set your Azure AD credentials in the generated `.mcp.json`.
 </details>
 
 <details>
-<summary><b>Option C: Manual MCP Configuration</b></summary>
+<summary><b>Option D: Manual MCP Configuration</b></summary>
 
 Add to your IDE's MCP config (`.mcp.json`, `settings.json`, or Claude Desktop config):
 

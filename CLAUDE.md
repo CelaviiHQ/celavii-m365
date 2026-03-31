@@ -9,6 +9,7 @@ Open-source MCP server for Microsoft 365 (Outlook, Calendar, OneDrive, Power Aut
 - `.claude-plugin/` — Claude Code plugin manifest
 - `.mcp.json` — MCP server config (used by plugin auto-install)
 - `install.sh` — Cross-IDE installer (Claude Code, Windsurf, Cursor)
+- `build-plugin.sh` — Generates plugin ZIP for Claude Desktop upload
 
 ## Development
 

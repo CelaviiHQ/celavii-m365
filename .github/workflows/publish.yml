@@ -70,3 +70,21 @@ jobs:
         run: npm publish --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build plugin ZIP
+        run: ./build-plugin.sh celavii-m365-plugin.zip
+
+      - name: Create GitHub Release with plugin ZIP
+        uses: softprops/action-gh-release@v2
+        with:
+          files: celavii-m365-plugin.zip
+          generate_release_notes: true
