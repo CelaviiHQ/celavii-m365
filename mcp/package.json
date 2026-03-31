@@ -1,6 +1,6 @@
 {
   "name": "celavii-m365",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "Microsoft 365 MCP Server — Connect Outlook, Calendar, OneDrive & Power Automate to AI-powered IDEs",
   "author": "Celavii <engineering@celavii.com>",
   "license": "MIT",
