@@ -10,7 +10,7 @@ set -euo pipefail
 #   - skills/                     (6 Agent Skills)
 #
 # Usage:
-#   ./build-plugin.sh                                    # generic (empty credentials)
+#   ./build-plugin.sh                                    # interactive prompts
 #   ./build-plugin.sh --client-id XXX --secret YYY       # with credentials baked in
 #   ./build-plugin.sh -o my-plugin.zip --client-id XXX   # custom output path
 # ================================================================
@@ -35,18 +35,19 @@ while [ "$#" -gt 0 ]; do
     -h|--help)
       echo "Usage: ./build-plugin.sh [options]"
       echo ""
+      echo "  Run without options for interactive mode (prompts for credentials)."
+      echo ""
       echo "Options:"
       echo "  -o, --output <file>     Output ZIP path (default: celavii-m365-plugin.zip)"
       echo "  --client-id <id>        Azure AD Application (client) ID"
       echo "  --secret <secret>       Azure AD client secret value"
-      echo "  --tenant-id <id>        Azure AD tenant ID (optional)"
-      echo "  --token-path <path>     Absolute path to token file (recommended for Cowork/Chat)"
-      echo "  --http                  Use HTTP transport (recommended for Cowork/Chat)"
+      echo "  --tenant-id <id>        Azure AD tenant ID (optional, defaults to multi-tenant)"
+      echo "  --token-path <path>     Custom token storage path"
+      echo "  --http                  Use HTTP transport instead of stdio"
       echo ""
       echo "Examples:"
-      echo "  ./build-plugin.sh"
-      echo "  ./build-plugin.sh --client-id abc123 --secret xyz789"
-      echo "  ./build-plugin.sh --client-id abc123 --secret xyz789 --token-path \$HOME/.celavii-m365-tokens.json"
+      echo "  ./build-plugin.sh                                          # interactive"
+      echo "  ./build-plugin.sh --client-id abc123 --secret xyz789       # non-interactive"
       exit 0
       ;;
     *)
@@ -59,6 +60,33 @@ while [ "$#" -gt 0 ]; do
       ;;
   esac
 done
+
+# ─── Interactive mode ─────────────────────────────────────────────
+# If no credentials provided and running in a terminal, prompt for them
+
+if [ -z "$CLIENT_ID" ] && [ -z "$HTTP_MODE" ] && [ -t 0 ]; then
+  echo ""
+  echo "╔══════════════════════════════════════════════════════╗"
+  echo "║       Celavii M365 — Plugin Builder                  ║"
+  echo "╚══════════════════════════════════════════════════════╝"
+  echo ""
+  echo "Enter your Azure AD credentials (from Azure Portal > App registrations)."
+  echo "These will be embedded in the plugin ZIP for Claude Desktop."
+  echo ""
+
+  read -rp "  Client ID:     " CLIENT_ID
+  echo ""
+  read -rp "  Client Secret: " CLIENT_SECRET
+  echo ""
+  read -rp "  Tenant ID (press Enter for multi-tenant): " TENANT_ID
+  echo ""
+
+  if [ -z "$CLIENT_ID" ] || [ -z "$CLIENT_SECRET" ]; then
+    echo "⚠️  No credentials entered — building plugin with empty credentials."
+    echo "   You can fill them in later via Claude Desktop → Customize → Connectors."
+    echo ""
+  fi
+fi
 
 OUTPUT="${OUTPUT:-celavii-m365-plugin.zip}"
 
@@ -154,14 +182,18 @@ else
 fi
 
 echo ""
-echo "To install:"
-echo "  1. Open Claude Desktop → Customize → + (Add plugin)"
-echo "  2. Click 'Browse files' and select this ZIP"
+echo "Next steps:"
+echo "  1. Open Claude Desktop"
+echo "  2. Click Customize (bottom-left) → + → Upload local plugin"
+echo "  3. Select this ZIP: $OUTPUT"
 
 if [ -n "$HTTP_MODE" ]; then
-  echo "  3. Start the HTTP server: npx celavii-m365-http"
-  echo "  4. Open http://localhost:3333/auth in your browser to authenticate"
-  echo "  5. Start a new chat — all tools are ready"
+  echo "  4. Start the HTTP server: npx celavii-m365-http"
+  echo "  5. Open http://localhost:3333/auth in your browser to sign in"
 else
-  echo "  3. Start a new chat and ask Claude to authenticate with Microsoft 365"
+  echo "  4. Start a new chat and say: \"Authenticate with Microsoft 365\""
+  echo "  5. Click the auth link and sign in with your Microsoft account"
 fi
+
+echo ""
+echo "  That's it! Ask Claude to read your emails, check your calendar, etc."
