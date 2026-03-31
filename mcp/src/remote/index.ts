@@ -141,7 +141,13 @@ function errorPage(title: string, detail: string): string {
 
 // ─── Express App ──────────────────────────────────────────────────────────────
 
-const app = createMcpExpressApp({ host: HOST })
+// When M365_ALLOWED_HOSTS is set (e.g. behind a Cloudflare tunnel), use those hosts.
+// Otherwise, use the SDK's default localhost DNS rebinding protection.
+const allowedHosts = process.env.M365_ALLOWED_HOSTS?.split(',').map(h => h.trim()).filter(Boolean)
+
+const app = allowedHosts
+  ? createMcpExpressApp({ host: HOST, allowedHosts: [...allowedHosts, 'localhost', '127.0.0.1', '[::1]'] })
+  : createMcpExpressApp({ host: HOST })
 
 // ─── OAuth Routes ─────────────────────────────────────────────────────────────
 

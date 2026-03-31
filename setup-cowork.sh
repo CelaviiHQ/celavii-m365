@@ -123,37 +123,7 @@ if [ -n "$PID" ]; then
   sleep 1
 fi
 
-# ─── Start the MCP HTTP server ────────────────────────────────────
-echo ""
-echo "Starting MCP server..."
-
-M365_CLIENT_ID="$CLIENT_ID" \
-M365_CLIENT_SECRET="$CLIENT_SECRET" \
-M365_TENANT_ID="$TENANT_ID" \
-M365_AUTH_PORT="$PORT" \
-node "$SCRIPT_DIR/mcp/dist/remote/index.js" &
-HTTP_PID=$!
-
-# Wait for server to be ready
-for i in $(seq 1 15); do
-  if curl -sf "http://localhost:$PORT/health" >/dev/null 2>&1; then
-    break
-  fi
-  if ! kill -0 "$HTTP_PID" 2>/dev/null; then
-    echo "  ✗ MCP server failed to start."
-    exit 1
-  fi
-  sleep 1
-done
-
-if ! curl -sf "http://localhost:$PORT/health" >/dev/null 2>&1; then
-  echo "  ✗ MCP server did not become ready."
-  kill "$HTTP_PID" 2>/dev/null || true
-  exit 1
-fi
-echo "  ✓ MCP server running on port $PORT"
-
-# ─── Start Cloudflare tunnel ─────────────────────────────────────
+# ─── Start Cloudflare tunnel first (we need the hostname for the server) ──────
 echo ""
 echo "Starting HTTPS tunnel..."
 
@@ -174,11 +144,46 @@ done
 if [ -z "$TUNNEL_URL" ]; then
   echo "  ✗ Failed to create tunnel. Check cloudflared output:"
   cat "$TUNNEL_LOG"
-  kill "$HTTP_PID" 2>/dev/null || true
   kill "$TUNNEL_PID" 2>/dev/null || true
   exit 1
 fi
 echo "  ✓ Tunnel: $TUNNEL_URL"
+
+# Extract hostname from tunnel URL for DNS rebinding protection allowlist
+TUNNEL_HOST=$(echo "$TUNNEL_URL" | sed 's|https://||')
+
+# ─── Start the MCP HTTP server ────────────────────────────────────
+echo ""
+echo "Starting MCP server..."
+
+M365_CLIENT_ID="$CLIENT_ID" \
+M365_CLIENT_SECRET="$CLIENT_SECRET" \
+M365_TENANT_ID="$TENANT_ID" \
+M365_AUTH_PORT="$PORT" \
+M365_ALLOWED_HOSTS="$TUNNEL_HOST" \
+node "$SCRIPT_DIR/mcp/dist/remote/index.js" &
+HTTP_PID=$!
+
+# Wait for server to be ready
+for i in $(seq 1 15); do
+  if curl -sf "http://localhost:$PORT/health" >/dev/null 2>&1; then
+    break
+  fi
+  if ! kill -0 "$HTTP_PID" 2>/dev/null; then
+    echo "  ✗ MCP server failed to start."
+    kill "$TUNNEL_PID" 2>/dev/null || true
+    exit 1
+  fi
+  sleep 1
+done
+
+if ! curl -sf "http://localhost:$PORT/health" >/dev/null 2>&1; then
+  echo "  ✗ MCP server did not become ready."
+  kill "$HTTP_PID" 2>/dev/null || true
+  kill "$TUNNEL_PID" 2>/dev/null || true
+  exit 1
+fi
+echo "  ✓ MCP server running on port $PORT"
 
 # ─── Handle authentication ───────────────────────────────────────
 AUTH_STATUS=$(curl -sf "http://localhost:$PORT/health" 2>/dev/null \

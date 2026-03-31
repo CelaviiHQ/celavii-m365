@@ -44,6 +44,16 @@ The script will:
 
 **Requirements:** `node`, `cloudflared` (auto-installed via Homebrew if missing)
 
+> **Note:** The free quick tunnel generates a random URL that changes on every restart. For a **persistent URL** that survives restarts, set up a [named Cloudflare tunnel](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/get-started/) (free Cloudflare account required):
+>
+> ```bash
+> cloudflared tunnel login
+> cloudflared tunnel create celavii-m365
+> cloudflared tunnel route dns celavii-m365 mcp.yourdomain.com
+> ```
+>
+> Then start the tunnel with `cloudflared tunnel run celavii-m365` instead of the quick tunnel. See [Persistent Tunnel Setup](#persistent-tunnel-setup) for details.
+
 ### Option B: Code tab (plugin)
 
 The Code tab runs MCP servers locally with full filesystem access. A single plugin ZIP handles everything.
@@ -147,6 +157,44 @@ The MCP server supports two transport modes:
 | `M365_REDIRECT_URI` | No | OAuth callback URL. Defaults to `http://localhost:3333/auth/callback` |
 | `M365_TOKEN_PATH` | No | Custom path for token storage. Defaults to `~/.celavii-m365-tokens.json` |
 | `M365_AUTH_PORT` | No | HTTP server port. Defaults to `3333` |
+| `M365_ALLOWED_HOSTS` | No | Comma-separated hostnames for DNS rebinding protection (e.g. `mcp.example.com`). Required when running behind a reverse proxy or tunnel. |
+
+## Persistent Tunnel Setup
+
+The quick tunnel (`setup-cowork.sh`) generates a random URL that changes on every restart. For a permanent URL:
+
+1. **Create a free [Cloudflare account](https://dash.cloudflare.com/sign-up)** and add a domain
+
+2. **Log in and create a named tunnel:**
+   ```bash
+   cloudflared tunnel login
+   cloudflared tunnel create celavii-m365
+   cloudflared tunnel route dns celavii-m365 mcp.yourdomain.com
+   ```
+
+3. **Create `~/.cloudflared/config.yml`:**
+   ```yaml
+   tunnel: <TUNNEL_ID>
+   credentials-file: ~/.cloudflared/<TUNNEL_ID>.json
+
+   ingress:
+     - hostname: mcp.yourdomain.com
+       service: http://localhost:3333
+     - service: http_status:404
+   ```
+
+4. **Start the server with the allowed host:**
+   ```bash
+   M365_CLIENT_ID=... M365_CLIENT_SECRET=... M365_TENANT_ID=... \
+   M365_ALLOWED_HOSTS=mcp.yourdomain.com \
+   node mcp/dist/remote/index.js &
+
+   cloudflared tunnel run celavii-m365
+   ```
+
+5. **Set the connector URL in Claude Desktop** to `https://mcp.yourdomain.com/mcp` — this URL never changes.
+
+> **Optional:** Install cloudflared as a [macOS launch agent](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/configure-tunnels/local-management/as-a-service/macos/) to auto-start the tunnel on login.
 
 ## All 35 Tools
 
