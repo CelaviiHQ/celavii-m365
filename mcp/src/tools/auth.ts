@@ -8,6 +8,7 @@ export function registerAuthTools(
   server: McpServer,
   _client: GraphClient,
   tokenStore: TokenStore,
+  options?: { isAuthServerRunning?: () => boolean },
 ) {
   // ─── Authenticate ────────────────────────────────────────────────────
 
@@ -20,6 +21,18 @@ export function registerAuthTools(
       inputSchema: z.object({}),
     },
     async () => {
+      if (options?.isAuthServerRunning && !options.isAuthServerRunning()) {
+        return textResponse(
+          [
+            'Error: The embedded auth server is not running (port is in use by another process).',
+            '',
+            'To fix this:',
+            `  1. Stop the process using port ${process.env.M365_AUTH_PORT || '3333'}, or`,
+            '  2. Set M365_AUTH_PORT to a different port and restart.',
+          ].join('\n'),
+        )
+      }
+
       const port = process.env.M365_AUTH_PORT || '3333'
       const authUrl = `http://localhost:${port}/auth`
 

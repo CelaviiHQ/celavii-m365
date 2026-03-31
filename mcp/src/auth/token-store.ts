@@ -20,7 +20,6 @@ export class TokenStore {
 
   private async load(): Promise<void> {
     if (this.loaded) return
-    this.loaded = true
 
     // Support env-based refresh token (for Cowork/Chat where filesystem is sandboxed)
     const envRefreshToken = process.env.M365_REFRESH_TOKEN
@@ -37,7 +36,10 @@ export class TokenStore {
         this.tokens = { graph: graphTokens }
         this.loaded = true
         return
-      } catch {
+      } catch (err) {
+        process.stderr.write(
+          `[celavii-m365] M365_REFRESH_TOKEN exchange failed: ${err instanceof Error ? err.message : err}\n`,
+        )
         // Fall through to file-based loading
       }
     }
@@ -73,6 +75,12 @@ export class TokenStore {
     } catch {
       // Corrupt file — start fresh
       this.tokens = null
+    }
+
+    // Only mark as loaded if we actually found tokens.
+    // This allows retrying after the user completes auth and tokens are saved to disk.
+    if (this.tokens) {
+      this.loaded = true
     }
   }
 
@@ -166,6 +174,7 @@ export class TokenStore {
       graph: graphTokens,
       ...(flowTokens ? { flow: flowTokens } : {}),
     }
+    this.loaded = true
     await this.save()
   }
 

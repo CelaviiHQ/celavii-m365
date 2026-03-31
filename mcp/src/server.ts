@@ -20,6 +20,7 @@ export interface CreateServerOptions {
   redirectUri?: string
   tokenStorePath?: string
   tokenStore?: TokenStore
+  isAuthServerRunning?: () => boolean
 }
 
 // ─── Server Factory ──────────────────────────────────────────────────────────
@@ -55,7 +56,9 @@ export function createServer(options: CreateServerOptions): McpServer {
   const client = new GraphClient(tokenStore)
 
   // Register all tool groups
-  registerAuthTools(server, client, tokenStore)
+  registerAuthTools(server, client, tokenStore, {
+    isAuthServerRunning: options.isAuthServerRunning,
+  })
   registerEmailTools(server, client)
   registerCalendarTools(server, client)
   registerFolderTools(server, client)

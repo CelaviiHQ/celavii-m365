@@ -55,6 +55,13 @@ async function main() {
 
   const tokenStore = new TokenStore(authConfig, tokenStorePath)
 
+  // ─── Auth Server State ───────────────────────────────────────────────
+  // Track whether the embedded auth server is actually listening so the
+  // authenticate tool can report a clear error instead of sending the
+  // user to a URL served by a different process.
+
+  let authServerRunning = false
+
   // ─── Start MCP Server (stdio) ────────────────────────────────────────
 
   const server = createServer({
@@ -64,6 +71,7 @@ async function main() {
     redirectUri,
     tokenStorePath,
     tokenStore,
+    isAuthServerRunning: () => authServerRunning,
   })
 
   const transport = new StdioServerTransport()
@@ -218,12 +226,14 @@ async function main() {
   })
 
   authServer.listen(authPort, authHost, () => {
+    authServerRunning = true
     // Log to stderr so it doesn't interfere with stdio MCP transport
     process.stderr.write(`Auth server listening on http://${authHost}:${authPort}/auth\n`)
   })
 
   // If the port is already in use, don't crash the MCP server
   authServer.on('error', (err: NodeJS.ErrnoException) => {
+    authServerRunning = false
     if (err.code === 'EADDRINUSE') {
       process.stderr.write(`Auth server port ${authPort} already in use — auth server disabled\n`)
     } else {
