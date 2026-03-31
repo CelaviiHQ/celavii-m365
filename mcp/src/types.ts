@@ -242,3 +242,4 @@ export const ONEDRIVE_SELECT_FIELDS = [
 export const DEFAULT_PAGE_SIZE = 25
 export const MAX_RESULT_COUNT = 50
 export const UPLOAD_THRESHOLD = 4 * 1024 * 1024 // 4MB
+export const CHARACTER_LIMIT = 25000 // Max response size in characters

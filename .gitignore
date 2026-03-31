@@ -8,3 +8,4 @@ dist/
 *.log
 .celavii-m365-tokens.json
 *.zip
+.research/

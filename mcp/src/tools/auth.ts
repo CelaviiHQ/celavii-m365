@@ -2,7 +2,7 @@ import { z } from 'zod'
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import type { GraphClient } from '../client.js'
 import type { TokenStore } from '../auth/token-store.js'
-import { textResponse } from '../utils/formatting.js'
+import { textResponse, actionResponse } from '../utils/formatting.js'
 
 export function registerAuthTools(
   server: McpServer,
@@ -13,12 +13,18 @@ export function registerAuthTools(
   // ─── Authenticate ────────────────────────────────────────────────────
 
   server.registerTool(
-    'authenticate',
+    'm365_authenticate',
     {
       title: 'Authenticate with Microsoft 365',
       description:
-        'Start the OAuth authentication flow. Returns a URL to visit in your browser to authorize access to your Microsoft 365 account.',
+        'Start the OAuth authentication flow for Microsoft 365. Returns a URL to visit in your browser to authorize access. Required before using any other m365_ tools.',
       inputSchema: z.object({}),
+      annotations: {
+        readOnlyHint: false,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: true,
+      },
     },
     async () => {
       if (options?.isAuthServerRunning && !options.isAuthServerRunning()) {
@@ -52,29 +58,37 @@ export function registerAuthTools(
   // ─── Check Auth Status ───────────────────────────────────────────────
 
   server.registerTool(
-    'check_auth_status',
+    'm365_check_auth_status',
     {
       title: 'Check Authentication Status',
       description:
-        'Check whether you are currently authenticated with Microsoft 365 and if your tokens are valid.',
+        'Check whether you are currently authenticated with Microsoft 365 and if your access tokens are valid. Use this to verify connectivity before other operations.',
       inputSchema: z.object({}),
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: true,
+      },
     },
     async () => {
       const isAuth = await tokenStore.isAuthenticated()
 
       if (!isAuth) {
         return textResponse(
-          'Not authenticated. Use the "authenticate" tool to connect your Microsoft 365 account.',
+          'Not authenticated. Use the "m365_authenticate" tool to connect your Microsoft 365 account.',
         )
       }
 
       try {
-        // Verify the token actually works
         await tokenStore.getGraphToken()
-        return textResponse('Authenticated and token is valid.')
+        return actionResponse(
+          'Authenticated and token is valid.',
+          { authenticated: true, tokenValid: true },
+        )
       } catch (err) {
         return textResponse(
-          `Authentication found but token may be expired: ${err instanceof Error ? err.message : 'Unknown error'}. Try re-authenticating.`,
+          `Authentication found but token may be expired: ${err instanceof Error ? err.message : 'Unknown error'}. Try re-authenticating with m365_authenticate.`,
         )
       }
     },
@@ -83,28 +97,43 @@ export function registerAuthTools(
   // ─── Logout ──────────────────────────────────────────────────────────
 
   server.registerTool(
-    'logout',
+    'm365_logout',
     {
       title: 'Logout from Microsoft 365',
       description:
-        'Clear stored authentication tokens. You will need to re-authenticate after this.',
+        'Clear stored authentication tokens for Microsoft 365. You will need to re-authenticate with m365_authenticate after this.',
       inputSchema: z.object({}),
+      annotations: {
+        readOnlyHint: false,
+        destructiveHint: true,
+        idempotentHint: true,
+        openWorldHint: false,
+      },
     },
     async () => {
       await tokenStore.clear()
-      return textResponse('Successfully logged out. Tokens have been cleared.')
+      return actionResponse(
+        'Successfully logged out. Tokens have been cleared.',
+        { loggedOut: true },
+      )
     },
   )
 
   // ─── About ───────────────────────────────────────────────────────────
 
   server.registerTool(
-    'about',
+    'm365_about',
     {
       title: 'About Celavii M365',
       description:
         'Get information about this MCP server, its version, and available capabilities.',
       inputSchema: z.object({}),
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: false,
+      },
     },
     async () => {
       return textResponse(
@@ -114,12 +143,12 @@ export function registerAuthTools(
           'An open-source MCP server for Microsoft 365 integration.',
           '',
           'Capabilities:',
-          '  - Email: Read, search, send, draft, organize',
-          '  - Calendar: List, create, accept, decline, cancel events',
-          '  - OneDrive: Browse, search, upload, download, share files',
-          '  - Folders: List, create, move emails between folders',
-          '  - Rules: List, create, reorder inbox rules',
-          '  - Power Automate: List, run, toggle flows',
+          '  - Email: Read, search, send, draft, organize (m365_list_emails, m365_search_emails, ...)',
+          '  - Calendar: List, create, accept, decline, cancel events (m365_list_events, ...)',
+          '  - OneDrive: Browse, search, upload, download, share files (m365_onedrive_list, ...)',
+          '  - Folders: List, create, move emails between folders (m365_list_folders, ...)',
+          '  - Rules: List, create, reorder inbox rules (m365_list_rules, ...)',
+          '  - Power Automate: List, run, toggle flows (m365_flow_list, ...)',
           '',
           'Source: https://github.com/CelaviiHQ/celavii-m365',
           'License: MIT',

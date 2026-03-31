@@ -5,17 +5,17 @@ import { escapeOData, sanitizeHtml } from '../client.js'
 import type { EmailMessage } from '../types.js'
 import { EMAIL_SELECT_FIELDS, EMAIL_DETAIL_FIELDS, DEFAULT_PAGE_SIZE, MAX_RESULT_COUNT } from '../types.js'
 import { resolveMailFolderPath } from '../utils/folders.js'
-import { formatEmail, textResponse, errorResponse } from '../utils/formatting.js'
+import { formatEmail, textResponse, paginatedResponse, actionResponse, batchResponse } from '../utils/formatting.js'
 
 export function registerEmailTools(server: McpServer, client: GraphClient) {
   // ─── List Emails ─────────────────────────────────────────────────────
 
   server.registerTool(
-    'list_emails',
+    'm365_list_emails',
     {
       title: 'List Emails',
       description:
-        'List emails from a mailbox folder. Returns subject, sender, date, read status, and ID for each email.',
+        'List emails from a Microsoft 365 mailbox folder. Returns subject, sender, date, read status, and message ID for each email. Use skip parameter for pagination.',
       inputSchema: z.object({
         folder: z
           .string()
@@ -33,16 +33,27 @@ export function registerEmailTools(server: McpServer, client: GraphClient) {
           .int()
           .min(0)
           .optional()
-          .describe('Number of emails to skip for pagination.'),
+          .describe('Number of emails to skip for pagination. Use with count to page through results.'),
         unread_only: z
           .boolean()
           .optional()
           .describe('If true, only return unread emails.'),
+        response_format: z
+          .enum(['text', 'json'])
+          .optional()
+          .describe("Output format: 'text' for human-readable (default), 'json' for structured data."),
       }),
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: true,
+      },
     },
     async (args) => {
       const path = resolveMailFolderPath(args.folder)
       const count = args.count || DEFAULT_PAGE_SIZE
+      const skip = args.skip || 0
 
       const queryParams: Record<string, string> = {
         $top: String(count),
@@ -50,28 +61,29 @@ export function registerEmailTools(server: McpServer, client: GraphClient) {
         $select: EMAIL_SELECT_FIELDS,
       }
 
-      if (args.skip) queryParams.$skip = String(args.skip)
+      if (skip) queryParams.$skip = String(skip)
       if (args.unread_only) queryParams.$filter = 'isRead eq false'
 
       const emails = (await client.graphGetPaginated(path, queryParams, count)) as EmailMessage[]
+      // Graph doesn't reliably return total count, so estimate based on whether we got a full page
+      const total = emails.length < count ? skip + emails.length : skip + emails.length + 1
 
       if (emails.length === 0) {
         return textResponse('No emails found.')
       }
 
-      const formatted = emails.map((e, i) => formatEmail(e, i)).join('\n\n')
-      return textResponse(`Found ${emails.length} email(s):\n\n${formatted}`)
+      return paginatedResponse(emails, total, skip, formatEmail, 'email(s)', args.response_format)
     },
   )
 
   // ─── Search Emails ───────────────────────────────────────────────────
 
   server.registerTool(
-    'search_emails',
+    'm365_search_emails',
     {
       title: 'Search Emails',
       description:
-        'Search emails using filters like sender, subject, keywords, attachment status, and read status.',
+        'Search emails in Microsoft 365 using filters like sender, subject, keywords, attachment status, and read status. Combines filters with AND logic.',
       inputSchema: z.object({
         query: z
           .string()
@@ -104,13 +116,22 @@ export function registerEmailTools(server: McpServer, client: GraphClient) {
           .max(MAX_RESULT_COUNT)
           .optional()
           .describe(`Max results to return (1-${MAX_RESULT_COUNT}). Defaults to ${DEFAULT_PAGE_SIZE}.`),
+        response_format: z
+          .enum(['text', 'json'])
+          .optional()
+          .describe("Output format: 'text' for human-readable (default), 'json' for structured data."),
       }),
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: true,
+      },
     },
     async (args) => {
       const path = resolveMailFolderPath(args.folder)
       const count = args.count || DEFAULT_PAGE_SIZE
 
-      // Build OData filter
       const filters: string[] = []
       if (args.from) {
         filters.push(`from/emailAddress/address eq '${escapeOData(args.from)}'`)
@@ -144,19 +165,18 @@ export function registerEmailTools(server: McpServer, client: GraphClient) {
         return textResponse('No emails matching your search criteria.')
       }
 
-      const formatted = emails.map((e, i) => formatEmail(e, i)).join('\n\n')
-      return textResponse(`Found ${emails.length} email(s):\n\n${formatted}`)
+      return paginatedResponse(emails, emails.length, 0, formatEmail, 'email(s)', args.response_format)
     },
   )
 
   // ─── Read Email ──────────────────────────────────────────────────────
 
   server.registerTool(
-    'read_email',
+    'm365_read_email',
     {
       title: 'Read Email',
       description:
-        'Read the full content of a specific email by its ID. Returns sanitized text by default to prevent prompt injection from email content.',
+        'Read the full content of a specific email by its message ID. Returns headers, body (sanitized by default to prevent prompt injection), and metadata. Use include_raw_html with caution.',
       inputSchema: z.object({
         id: z.string().describe('The email message ID.'),
         include_raw_html: z
@@ -164,6 +184,12 @@ export function registerEmailTools(server: McpServer, client: GraphClient) {
           .optional()
           .describe('If true, include the raw HTML body in addition to sanitized text. Use with caution.'),
       }),
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: true,
+      },
     },
     async (args) => {
       const email = (await client.graphGet(`/me/messages/${encodeURIComponent(args.id)}`, {
@@ -188,7 +214,6 @@ export function registerEmailTools(server: McpServer, client: GraphClient) {
       lines.push(`Read: ${email.isRead}`)
       lines.push('')
 
-      // Always provide sanitized text version
       if (email.body?.content) {
         if (email.body.contentType === 'html') {
           lines.push('--- Body (sanitized text) ---')
@@ -212,16 +237,17 @@ export function registerEmailTools(server: McpServer, client: GraphClient) {
   // ─── Send Email ──────────────────────────────────────────────────────
 
   server.registerTool(
-    'send_email',
+    'm365_send_email',
     {
       title: 'Send Email',
-      description: 'Compose and send an email. Supports HTML content, CC/BCC, and importance levels.',
+      description:
+        'Compose and send an email via Microsoft 365. Supports multiple recipients, CC/BCC, HTML content (auto-detected), and importance levels. This action cannot be undone.',
       inputSchema: z.object({
         to: z
           .array(z.string())
           .describe('Array of recipient email addresses.'),
         subject: z.string().describe('Email subject line.'),
-        body: z.string().describe('Email body content. HTML is auto-detected.'),
+        body: z.string().describe('Email body content. HTML is auto-detected from tags.'),
         cc: z
           .array(z.string())
           .optional()
@@ -235,6 +261,12 @@ export function registerEmailTools(server: McpServer, client: GraphClient) {
           .optional()
           .describe('Email importance level. Defaults to normal.'),
       }),
+      annotations: {
+        readOnlyHint: false,
+        destructiveHint: false,
+        idempotentHint: false,
+        openWorldHint: true,
+      },
     },
     async (args) => {
       const isHtml = /<[a-z][\s\S]*>/i.test(args.body)
@@ -266,23 +298,27 @@ export function registerEmailTools(server: McpServer, client: GraphClient) {
       }
 
       await client.graphPost('/me/sendMail', { message })
-      return textResponse(`Email sent successfully to ${args.to.join(', ')}.`)
+      return actionResponse(
+        `Email sent successfully to ${args.to.join(', ')}.`,
+        { sent: true, to: args.to, subject: args.subject },
+      )
     },
   )
 
   // ─── Draft Email ─────────────────────────────────────────────────────
 
   server.registerTool(
-    'draft_email',
+    'm365_draft_email',
     {
       title: 'Create Draft Email',
-      description: 'Create a draft email without sending it. Saved to the Drafts folder.',
+      description:
+        'Create a draft email in Microsoft 365 without sending it. Saved to the Drafts folder. Use m365_send_email to send instead.',
       inputSchema: z.object({
         to: z
           .array(z.string())
           .describe('Array of recipient email addresses.'),
         subject: z.string().describe('Email subject line.'),
-        body: z.string().describe('Email body content. HTML is auto-detected.'),
+        body: z.string().describe('Email body content. HTML is auto-detected from tags.'),
         cc: z
           .array(z.string())
           .optional()
@@ -292,6 +328,12 @@ export function registerEmailTools(server: McpServer, client: GraphClient) {
           .optional()
           .describe('Email importance level.'),
       }),
+      annotations: {
+        readOnlyHint: false,
+        destructiveHint: false,
+        idempotentHint: false,
+        openWorldHint: true,
+      },
     },
     async (args) => {
       const isHtml = /<[a-z][\s\S]*>/i.test(args.body)
@@ -316,17 +358,21 @@ export function registerEmailTools(server: McpServer, client: GraphClient) {
       }
 
       const result = (await client.graphPost('/me/messages', draft)) as { id: string }
-      return textResponse(`Draft created successfully. ID: ${result.id}`)
+      return actionResponse(
+        `Draft created successfully. ID: ${result.id}`,
+        { created: true, id: result.id },
+      )
     },
   )
 
   // ─── Mark as Read/Unread ─────────────────────────────────────────────
 
   server.registerTool(
-    'mark_as_read',
+    'm365_mark_as_read',
     {
       title: 'Mark Email as Read/Unread',
-      description: 'Mark one or more emails as read or unread.',
+      description:
+        'Mark one or more emails as read or unread in Microsoft 365. Provide an array of message IDs. Reports which IDs failed if any.',
       inputSchema: z.object({
         ids: z
           .array(z.string())
@@ -335,6 +381,12 @@ export function registerEmailTools(server: McpServer, client: GraphClient) {
           .boolean()
           .describe('Set to true to mark as read, false for unread.'),
       }),
+      annotations: {
+        readOnlyHint: false,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: true,
+      },
     },
     async (args) => {
       const results = await Promise.allSettled(
@@ -345,16 +397,8 @@ export function registerEmailTools(server: McpServer, client: GraphClient) {
         ),
       )
 
-      const succeeded = results.filter((r) => r.status === 'fulfilled').length
-      const failed = results.filter((r) => r.status === 'rejected').length
-
       const status = args.is_read ? 'read' : 'unread'
-      if (failed === 0) {
-        return textResponse(`Marked ${succeeded} email(s) as ${status}.`)
-      }
-      return textResponse(
-        `Marked ${succeeded} email(s) as ${status}. ${failed} failed.`,
-      )
+      return batchResponse(results, args.ids, `Marked as ${status}`)
     },
   )
 }

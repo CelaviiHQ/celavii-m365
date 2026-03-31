@@ -278,6 +278,19 @@ Cowork runs MCP servers in a sandbox without filesystem access. The stdio plugin
 </details>
 
 <details>
+<summary><b>Cowork tools fail after server restart</b></summary>
+
+When the MCP server restarts, existing Cowork sessions lose their connection. To fix:
+
+1. Go to **Customize** → **Connectors**
+2. **Disconnect** celavii-m365, then **Reconnect** it
+3. Start a **new chat** — old sessions cannot recover
+
+If that doesn't work, remove the connector entirely and re-add it with the same URL.
+
+</details>
+
+<details>
 <summary><b>"Failed to add connector" (HTTPS required)</b></summary>
 
 Claude Desktop custom connectors require HTTPS URLs. The `setup-cowork.sh` script handles this automatically using a Cloudflare tunnel. If you're running the HTTP server manually, you need to set up your own HTTPS proxy or tunnel.

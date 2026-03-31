@@ -2,22 +2,28 @@ import { z } from 'zod'
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import type { GraphClient } from '../client.js'
 import type { InboxRule } from '../types.js'
-import { textResponse, jsonResponse } from '../utils/formatting.js'
+import { textResponse, jsonResponse, actionResponse } from '../utils/formatting.js'
 
 export function registerRuleTools(server: McpServer, client: GraphClient) {
   // ─── List Rules ──────────────────────────────────────────────────────
 
   server.registerTool(
-    'list_rules',
+    'm365_list_rules',
     {
       title: 'List Inbox Rules',
-      description: 'List all inbox rules with their conditions and actions.',
+      description: 'List all inbox rules in Microsoft 365 with their conditions, actions, and execution order. Use detailed=true to see full rule configuration as JSON.',
       inputSchema: z.object({
         detailed: z
           .boolean()
           .optional()
-          .describe('If true, include full conditions and actions for each rule.'),
+          .describe('If true, return full conditions and actions for each rule as JSON.'),
       }),
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: true,
+      },
     },
     async (args) => {
       const rules = (await client.graphGetPaginated('/me/mailFolders/inbox/messageRules')) as InboxRule[]
@@ -40,18 +46,21 @@ export function registerRuleTools(server: McpServer, client: GraphClient) {
         )
         .join('\n\n')
 
-      return textResponse(`Found ${rules.length} rule(s):\n\n${formatted}`)
+      return {
+        content: [{ type: 'text' as const, text: `Found ${rules.length} rule(s):\n\n${formatted}` }],
+        structuredContent: { total: rules.length, count: rules.length },
+      }
     },
   )
 
   // ─── Create Rule ─────────────────────────────────────────────────────
 
   server.registerTool(
-    'create_rule',
+    'm365_create_rule',
     {
       title: 'Create Inbox Rule',
       description:
-        'Create a new inbox rule with conditions (from, subject, attachments) and actions (move, mark read, etc.).',
+        'Create a new inbox rule in Microsoft 365 with conditions (from address, subject keywords, attachments) and actions (move to folder, mark as read). Use m365_list_folders to get folder IDs for move_to_folder.',
       inputSchema: z.object({
         name: z.string().describe('Display name for the rule.'),
         enabled: z
@@ -73,7 +82,7 @@ export function registerRuleTools(server: McpServer, client: GraphClient) {
         move_to_folder: z
           .string()
           .optional()
-          .describe('Folder ID to move matching emails to.'),
+          .describe('Folder ID to move matching emails to. Use m365_list_folders to find folder IDs.'),
         mark_as_read: z
           .boolean()
           .optional()
@@ -81,8 +90,14 @@ export function registerRuleTools(server: McpServer, client: GraphClient) {
         stop_processing: z
           .boolean()
           .optional()
-          .describe('Stop processing more rules. Defaults to false.'),
+          .describe('Stop processing more rules after this one matches. Defaults to false.'),
       }),
+      annotations: {
+        readOnlyHint: false,
+        destructiveHint: false,
+        idempotentHint: false,
+        openWorldHint: true,
+      },
     },
     async (args) => {
       const rule: Record<string, unknown> = {
@@ -94,7 +109,6 @@ export function registerRuleTools(server: McpServer, client: GraphClient) {
         actions: {},
       }
 
-      // Build conditions
       const conditions: Record<string, unknown> = {}
       if (args.from_addresses?.length) {
         conditions.senderContains = args.from_addresses
@@ -107,7 +121,6 @@ export function registerRuleTools(server: McpServer, client: GraphClient) {
       }
       rule.conditions = conditions
 
-      // Build actions
       const actions: Record<string, unknown> = {}
       if (args.move_to_folder) {
         actions.moveToFolder = args.move_to_folder
@@ -122,8 +135,9 @@ export function registerRuleTools(server: McpServer, client: GraphClient) {
         rule,
       )) as InboxRule
 
-      return textResponse(
+      return actionResponse(
         `Rule "${result.displayName}" created.\nSequence: ${result.sequence}\nID: ${result.id}`,
+        { created: true, id: result.id, name: result.displayName, sequence: result.sequence },
       )
     },
   )
@@ -131,10 +145,10 @@ export function registerRuleTools(server: McpServer, client: GraphClient) {
   // ─── Update Rule Sequence ────────────────────────────────────────────
 
   server.registerTool(
-    'update_rule_sequence',
+    'm365_update_rule_sequence',
     {
       title: 'Update Rule Sequence',
-      description: 'Change the execution order of an inbox rule.',
+      description: 'Change the execution order of an inbox rule in Microsoft 365. Lower sequence numbers run first.',
       inputSchema: z.object({
         id: z.string().describe('The rule ID to update.'),
         sequence: z
@@ -143,32 +157,47 @@ export function registerRuleTools(server: McpServer, client: GraphClient) {
           .min(1)
           .describe('New sequence number (lower = runs first).'),
       }),
+      annotations: {
+        readOnlyHint: false,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: true,
+      },
     },
     async (args) => {
       await client.graphPatch(
         `/me/mailFolders/inbox/messageRules/${encodeURIComponent(args.id)}`,
         { sequence: args.sequence },
       )
-      return textResponse(`Rule sequence updated to ${args.sequence}.`)
+      return actionResponse(
+        `Rule sequence updated to ${args.sequence}.`,
+        { updated: true, id: args.id, sequence: args.sequence },
+      )
     },
   )
 
   // ─── Delete Rule ─────────────────────────────────────────────────────
 
   server.registerTool(
-    'delete_rule',
+    'm365_delete_rule',
     {
       title: 'Delete Inbox Rule',
-      description: 'Delete an inbox rule.',
+      description: 'Permanently delete an inbox rule from Microsoft 365. This action cannot be undone.',
       inputSchema: z.object({
         id: z.string().describe('The rule ID to delete.'),
       }),
+      annotations: {
+        readOnlyHint: false,
+        destructiveHint: true,
+        idempotentHint: true,
+        openWorldHint: true,
+      },
     },
     async (args) => {
       await client.graphDelete(
         `/me/mailFolders/inbox/messageRules/${encodeURIComponent(args.id)}`,
       )
-      return textResponse('Rule deleted.')
+      return actionResponse('Rule deleted.', { deleted: true, id: args.id })
     },
   )
 }

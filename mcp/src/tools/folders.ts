@@ -2,24 +2,34 @@ import { z } from 'zod'
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import type { GraphClient } from '../client.js'
 import type { MailFolder } from '../types.js'
-import { textResponse } from '../utils/formatting.js'
+import { textResponse, actionResponse, batchResponse } from '../utils/formatting.js'
 import { resolveMailFolder } from '../utils/folders.js'
 
 export function registerFolderTools(server: McpServer, client: GraphClient) {
   // ─── List Folders ────────────────────────────────────────────────────
 
   server.registerTool(
-    'list_folders',
+    'm365_list_folders',
     {
       title: 'List Mail Folders',
       description:
-        'List all mail folders with their item counts and unread counts.',
+        'List all mail folders in Microsoft 365 with their total item counts, unread counts, and sub-folder counts. Optionally list child folders of a specific parent.',
       inputSchema: z.object({
         parent_folder: z
           .string()
           .optional()
-          .describe('Parent folder name or ID to list child folders of. Defaults to top-level folders.'),
+          .describe('Parent folder name (inbox, sent, drafts, etc.) or folder ID to list child folders of. Defaults to top-level folders.'),
+        response_format: z
+          .enum(['text', 'json'])
+          .optional()
+          .describe("Output format: 'text' for human-readable (default), 'json' for structured data."),
       }),
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: true,
+      },
     },
     async (args) => {
       const path = args.parent_folder
@@ -34,6 +44,24 @@ export function registerFolderTools(server: McpServer, client: GraphClient) {
         return textResponse('No folders found.')
       }
 
+      if (args.response_format === 'json') {
+        const structured = {
+          total: folders.length,
+          count: folders.length,
+          folders: folders.map((f) => ({
+            id: f.id,
+            name: f.displayName,
+            totalItems: f.totalItemCount,
+            unreadItems: f.unreadItemCount,
+            childFolders: f.childFolderCount,
+          })),
+        }
+        return {
+          content: [{ type: 'text' as const, text: JSON.stringify(structured, null, 2) }],
+          structuredContent: structured,
+        }
+      }
+
       const formatted = folders
         .map(
           (f, i) =>
@@ -43,17 +71,20 @@ export function registerFolderTools(server: McpServer, client: GraphClient) {
         )
         .join('\n\n')
 
-      return textResponse(`Found ${folders.length} folder(s):\n\n${formatted}`)
+      return {
+        content: [{ type: 'text' as const, text: `Found ${folders.length} folder(s):\n\n${formatted}` }],
+        structuredContent: { total: folders.length, count: folders.length },
+      }
     },
   )
 
   // ─── Create Folder ───────────────────────────────────────────────────
 
   server.registerTool(
-    'create_folder',
+    'm365_create_folder',
     {
       title: 'Create Mail Folder',
-      description: 'Create a new mail folder, optionally inside a parent folder.',
+      description: 'Create a new mail folder in Microsoft 365, optionally inside a parent folder. Use for organizing your inbox.',
       inputSchema: z.object({
         name: z.string().describe('Name for the new folder.'),
         parent_folder: z
@@ -61,6 +92,12 @@ export function registerFolderTools(server: McpServer, client: GraphClient) {
           .optional()
           .describe('Parent folder name or ID. Defaults to top-level.'),
       }),
+      annotations: {
+        readOnlyHint: false,
+        destructiveHint: false,
+        idempotentHint: false,
+        openWorldHint: true,
+      },
     },
     async (args) => {
       const path = args.parent_folder
@@ -71,8 +108,9 @@ export function registerFolderTools(server: McpServer, client: GraphClient) {
         displayName: args.name,
       })) as MailFolder
 
-      return textResponse(
+      return actionResponse(
         `Folder "${result.displayName}" created successfully.\nID: ${result.id}`,
+        { created: true, id: result.id, name: result.displayName },
       )
     },
   )
@@ -80,10 +118,10 @@ export function registerFolderTools(server: McpServer, client: GraphClient) {
   // ─── Move Emails ─────────────────────────────────────────────────────
 
   server.registerTool(
-    'move_emails',
+    'm365_move_emails',
     {
       title: 'Move Emails to Folder',
-      description: 'Move one or more emails to a specified folder.',
+      description: 'Move one or more emails to a specified folder in Microsoft 365. Reports which message IDs failed if any.',
       inputSchema: z.object({
         ids: z
           .array(z.string())
@@ -92,12 +130,16 @@ export function registerFolderTools(server: McpServer, client: GraphClient) {
           .string()
           .describe('Destination folder name (inbox, sent, drafts, deleted, junk, archive) or folder ID.'),
       }),
+      annotations: {
+        readOnlyHint: false,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: true,
+      },
     },
     async (args) => {
-      // Resolve the destination folder ID
       let destinationId = args.destination_folder
 
-      // If it's a well-known name, we need to get the actual ID
       const wellKnown = ['inbox', 'drafts', 'sentitems', 'sent', 'deleteditems', 'deleted', 'trash', 'junkemail', 'junk', 'spam', 'archive', 'outbox']
       if (wellKnown.includes(args.destination_folder.toLowerCase())) {
         const folder = (await client.graphGet(
@@ -114,15 +156,7 @@ export function registerFolderTools(server: McpServer, client: GraphClient) {
         ),
       )
 
-      const succeeded = results.filter((r) => r.status === 'fulfilled').length
-      const failed = results.filter((r) => r.status === 'rejected').length
-
-      if (failed === 0) {
-        return textResponse(`Moved ${succeeded} email(s) successfully.`)
-      }
-      return textResponse(
-        `Moved ${succeeded} email(s). ${failed} failed.`,
-      )
+      return batchResponse(results, args.ids, `Moved to ${args.destination_folder}`)
     },
   )
 }
