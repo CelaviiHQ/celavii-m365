@@ -55,18 +55,52 @@ The plugin will appear under "Personal plugins" with 6 skills:
 - `/celavii-m365-flows` — Power Automate flows
 - `/celavii-m365-setup` — Setup and troubleshooting
 
-### Step 3: Connect to Microsoft 365
+### Step 3: Authenticate with Microsoft 365
 
-After installing the plugin, you need to connect it to your Microsoft 365 account:
+Authentication works differently depending on which Claude Desktop tab you're using:
 
-1. In Claude Desktop, go to **Customize** → **Celavii M365** → **Connectors**
-2. Enter your Azure AD credentials:
-   - **M365_CLIENT_ID** — Your app's Application (client) ID
-   - **M365_CLIENT_SECRET** — Your app's client secret value
-   - **M365_TENANT_ID** — Your Azure AD tenant ID (optional, defaults to multi-tenant)
-3. Start a new chat and ask Claude: *"Authenticate with Microsoft 365"*
-4. Claude will give you a link — click it to sign in with your Microsoft account
-5. After signing in, you're connected!
+<details open>
+<summary><b>Code tab</b></summary>
+
+1. Start a new chat and ask: *"Authenticate with Microsoft 365"*
+2. Claude will return an OAuth URL — open it in your browser
+3. Sign in with your Microsoft account
+4. Done! Tokens are saved locally.
+
+**Note:** If credentials are empty, go to **Customize** → **Celavii M365** → **Connectors** and fill in your `M365_CLIENT_ID`, `M365_CLIENT_SECRET`, and `M365_TENANT_ID`.
+
+</details>
+
+<details>
+<summary><b>Cowork tab</b></summary>
+
+Cowork's connector settings are **read-only** — credentials must be baked into the plugin ZIP at build time (see Step 1, Option B).
+
+To authenticate:
+
+1. Open a **terminal** and run the auth server:
+   ```bash
+   M365_CLIENT_ID=your-id M365_CLIENT_SECRET=your-secret M365_TENANT_ID=your-tenant npx celavii-m365-auth
+   ```
+2. Open **http://localhost:3333/auth** in your browser (this is important — use this URL, not the one from the chat)
+3. Sign in with your Microsoft account
+4. You'll see a success page — tokens are saved
+5. Go back to Cowork and ask: *"Check my auth status"*
+
+> **Why not use the authenticate tool?** The `authenticate` tool generates an OAuth URL, but its CSRF state token won't match the callback server. Always use `http://localhost:3333/auth` for Cowork.
+
+</details>
+
+<details>
+<summary><b>Chat tab</b></summary>
+
+Same process as Cowork — credentials must be in the ZIP, and you authenticate via the terminal auth server:
+
+1. Run the auth server in a terminal (see Cowork instructions above)
+2. Open **http://localhost:3333/auth** in your browser
+3. Sign in, then ask Claude to check auth status
+
+</details>
 
 ### Step 4: Start Using It
 
@@ -234,6 +268,63 @@ Add to your IDE's MCP config (`.mcp.json` or Claude Desktop config):
 - **OData escaping**: User input in filters properly escaped to prevent injection
 - **CSRF protection**: OAuth state parameters validated with 10-minute expiry
 - **No secrets in URLs**: Access tokens only sent in Authorization headers
+
+## Troubleshooting
+
+<details>
+<summary><b>"Invalid state parameter" / CSRF error on sign-in</b></summary>
+
+This happens when you click an OAuth URL from the chat but the auth callback server has a different state token. **Fix:** Don't use the URL from the chat. Instead:
+
+1. Run `npx celavii-m365-auth` in a terminal (with your env vars)
+2. Open **http://localhost:3333/auth** in your browser
+3. This generates a matching state token and handles the callback correctly
+
+</details>
+
+<details>
+<summary><b>"Plugin validation failed" when uploading ZIP</b></summary>
+
+The Cowork and Chat tabs have stricter YAML validation than the Code tab. Make sure your SKILL.md frontmatter only has `name` and `description` — no `metadata`, `user-invocable`, or other custom fields.
+
+</details>
+
+<details>
+<summary><b>Connector credentials are read-only (Cowork/Chat)</b></summary>
+
+Unlike the Code tab, Cowork and Chat don't let you edit connector environment variables after installing. You must bake credentials into the ZIP:
+
+```bash
+./build-plugin.sh --client-id YOUR_ID --secret YOUR_SECRET --tenant-id YOUR_TENANT
+```
+
+Then re-upload the ZIP.
+
+</details>
+
+<details>
+<summary><b>MCP server not connecting</b></summary>
+
+- Make sure **Node.js 18+** is installed: `node --version`
+- Check that `npx celavii-m365` works in your terminal
+- Restart Claude Desktop after installing or updating the plugin
+- Check **Customize** → **Connectors** to see if celavii-m365 shows a connection error
+
+</details>
+
+<details>
+<summary><b>Token expired or auth lost</b></summary>
+
+Tokens auto-refresh, but if they expire completely:
+
+1. Ask Claude: *"Logout from Microsoft 365"*
+2. Re-authenticate using the steps for your tab (see Step 3 above)
+
+Or delete the token file manually: `rm ~/.celavii-m365-tokens.json`
+
+</details>
+
+---
 
 ## Development
 
