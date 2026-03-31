@@ -140,7 +140,7 @@ else
   "mcpServers": {
     "celavii-m365": {
       "command": "npx",
-      "args": ["-y", "celavii-m365"],
+      "args": ["-y", "celavii-m365@latest"],
       "env": {
         "M365_CLIENT_ID": "${CLIENT_ID}",
         "M365_CLIENT_SECRET": "${CLIENT_SECRET}",
