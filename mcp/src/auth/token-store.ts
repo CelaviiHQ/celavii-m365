@@ -22,6 +22,26 @@ export class TokenStore {
     if (this.loaded) return
     this.loaded = true
 
+    // Support env-based refresh token (for Cowork/Chat where filesystem is sandboxed)
+    const envRefreshToken = process.env.M365_REFRESH_TOKEN
+    if (envRefreshToken && !this.tokens) {
+      try {
+        const graphTokens = await this.refreshToken(
+          {
+            access_token: '',
+            refresh_token: envRefreshToken,
+            expires_at: 0,
+          },
+          this.config.scopes.join(' '),
+        )
+        this.tokens = { graph: graphTokens }
+        this.loaded = true
+        return
+      } catch {
+        // Fall through to file-based loading
+      }
+    }
+
     if (!existsSync(this.storagePath)) return
 
     try {

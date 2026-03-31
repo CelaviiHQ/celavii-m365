@@ -1,7 +1,7 @@
 import { defineConfig } from 'tsup'
 
 export default defineConfig({
-  entry: ['src/index.ts', 'src/auth-server.ts'],
+  entry: ['src/index.ts', 'src/auth-server.ts', 'src/remote/index.ts'],
   format: ['esm'],
   target: 'node18',
   outDir: 'dist',

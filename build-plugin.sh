@@ -20,6 +20,8 @@ OUTPUT=""
 CLIENT_ID=""
 CLIENT_SECRET=""
 TENANT_ID=""
+TOKEN_PATH=""
+HTTP_MODE=""
 
 # Parse arguments
 while [ "$#" -gt 0 ]; do
@@ -28,6 +30,8 @@ while [ "$#" -gt 0 ]; do
     --client-id)       CLIENT_ID="$2"; shift 2 ;;
     --secret)          CLIENT_SECRET="$2"; shift 2 ;;
     --tenant-id)       TENANT_ID="$2"; shift 2 ;;
+    --token-path)      TOKEN_PATH="$2"; shift 2 ;;
+    --http)            HTTP_MODE="1"; shift ;;
     -h|--help)
       echo "Usage: ./build-plugin.sh [options]"
       echo ""
@@ -36,11 +40,13 @@ while [ "$#" -gt 0 ]; do
       echo "  --client-id <id>        Azure AD Application (client) ID"
       echo "  --secret <secret>       Azure AD client secret value"
       echo "  --tenant-id <id>        Azure AD tenant ID (optional)"
+      echo "  --token-path <path>     Absolute path to token file (recommended for Cowork/Chat)"
+      echo "  --http                  Use HTTP transport (recommended for Cowork/Chat)"
       echo ""
       echo "Examples:"
       echo "  ./build-plugin.sh"
       echo "  ./build-plugin.sh --client-id abc123 --secret xyz789"
-      echo "  ./build-plugin.sh --client-id abc123 --secret xyz789 --tenant-id def456"
+      echo "  ./build-plugin.sh --client-id abc123 --secret xyz789 --token-path \$HOME/.celavii-m365-tokens.json"
       exit 0
       ;;
     *)
@@ -88,7 +94,20 @@ trap "rm -rf $TMPDIR" EXIT
 cp -r .claude-plugin skills "$TMPDIR/"
 
 # Generate .mcp.json with credentials (or empty defaults)
-cat > "$TMPDIR/.mcp.json" << EOF
+if [ -n "$HTTP_MODE" ]; then
+  # HTTP transport — connect to running HTTP server
+  cat > "$TMPDIR/.mcp.json" << EOF
+{
+  "mcpServers": {
+    "celavii-m365": {
+      "url": "http://localhost:3333/mcp"
+    }
+  }
+}
+EOF
+else
+  # Stdio transport — launch process directly
+  cat > "$TMPDIR/.mcp.json" << EOF
 {
   "mcpServers": {
     "celavii-m365": {
@@ -97,12 +116,14 @@ cat > "$TMPDIR/.mcp.json" << EOF
       "env": {
         "M365_CLIENT_ID": "${CLIENT_ID}",
         "M365_CLIENT_SECRET": "${CLIENT_SECRET}",
-        "M365_TENANT_ID": "${TENANT_ID}"
+        "M365_TENANT_ID": "${TENANT_ID}",
+        "M365_TOKEN_PATH": "${TOKEN_PATH}"
       }
     }
   }
 }
 EOF
+fi
 
 # Remove old ZIP if it exists
 rm -f "$OUTPUT"
@@ -120,6 +141,12 @@ echo ""
 echo "✅ Plugin ZIP created: $OUTPUT"
 echo "   Skills: $SKILL_COUNT"
 
+if [ -n "$HTTP_MODE" ]; then
+  echo "   Transport: HTTP (url: http://localhost:3333/mcp)"
+else
+  echo "   Transport: stdio (npx celavii-m365)"
+fi
+
 if [ -n "$CLIENT_ID" ]; then
   echo "   Credentials: included"
 else
@@ -130,4 +157,11 @@ echo ""
 echo "To install:"
 echo "  1. Open Claude Desktop → Customize → + (Add plugin)"
 echo "  2. Click 'Browse files' and select this ZIP"
-echo "  3. Start a new chat and ask Claude to authenticate with Microsoft 365"
+
+if [ -n "$HTTP_MODE" ]; then
+  echo "  3. Start the HTTP server: npx celavii-m365-http"
+  echo "  4. Open http://localhost:3333/auth in your browser to authenticate"
+  echo "  5. Start a new chat — all tools are ready"
+else
+  echo "  3. Start a new chat and ask Claude to authenticate with Microsoft 365"
+fi

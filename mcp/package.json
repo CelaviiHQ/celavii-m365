@@ -7,7 +7,8 @@
   "type": "module",
   "bin": {
     "celavii-m365": "./dist/index.js",
-    "celavii-m365-auth": "./dist/auth-server.js"
+    "celavii-m365-auth": "./dist/auth-server.js",
+    "celavii-m365-http": "./dist/remote/index.js"
   },
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -20,13 +21,16 @@
     "dev": "tsup --watch",
     "start": "node dist/index.js",
     "typecheck": "tsc --noEmit",
-    "auth": "node dist/auth-server.js"
+    "auth": "node dist/auth-server.js",
+    "http": "node dist/remote/index.js"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.27.1",
+    "express": "^5.1.0",
     "zod": "^3.23.0"
   },
   "devDependencies": {
+    "@types/express": "^5.0.6",
     "@types/node": "^20.0.0",
     "tsup": "^8.4.0",
     "typescript": "^5.7.0"

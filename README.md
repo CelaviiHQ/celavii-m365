@@ -28,7 +28,7 @@ Connect Microsoft 365 to Claude — read emails, manage your calendar, browse On
 
 **Option A** — Download the generic ZIP from the [Releases page](https://github.com/CelaviiHQ/celavii-m365/releases) (you'll configure credentials after installing).
 
-**Option B** — Build a ZIP with your credentials pre-filled (recommended):
+**Option B** — Build a ZIP with your credentials pre-filled:
 
 ```bash
 git clone https://github.com/CelaviiHQ/celavii-m365.git
@@ -36,7 +36,15 @@ cd celavii-m365
 ./build-plugin.sh --client-id YOUR_CLIENT_ID --secret YOUR_SECRET --tenant-id YOUR_TENANT_ID
 ```
 
-This creates `celavii-m365-plugin.zip` ready to upload with everything configured.
+**Option C** — Build with HTTP transport (recommended for Cowork/Chat):
+
+```bash
+git clone https://github.com/CelaviiHQ/celavii-m365.git
+cd celavii-m365
+./build-plugin.sh --http
+```
+
+This creates a plugin ZIP that connects via HTTP instead of launching a process. See [HTTP Transport](#http-transport-recommended-for-coworkchat) below.
 
 ### Step 2: Install in Claude Desktop
 
@@ -57,10 +65,8 @@ The plugin will appear under "Personal plugins" with 6 skills:
 
 ### Step 3: Authenticate with Microsoft 365
 
-Authentication works differently depending on which Claude Desktop tab you're using:
-
 <details open>
-<summary><b>Code tab</b></summary>
+<summary><b>Code tab (stdio)</b></summary>
 
 1. Start a new chat and ask: *"Authenticate with Microsoft 365"*
 2. Claude will return an OAuth URL — open it in your browser
@@ -72,33 +78,31 @@ Authentication works differently depending on which Claude Desktop tab you're us
 </details>
 
 <details>
-<summary><b>Cowork tab</b></summary>
+<summary><b>Cowork / Chat tabs (HTTP transport — recommended)</b></summary>
 
-Cowork's connector settings are **read-only** — credentials must be baked into the plugin ZIP at build time (see Step 1, Option B).
+Use the HTTP server for Cowork and Chat. It runs both the MCP server and auth in one process, avoiding the CSRF issues that occur with separate processes.
 
-To authenticate:
-
-1. Open a **terminal** and run the auth server:
+1. **Start the HTTP server** in a terminal:
    ```bash
-   M365_CLIENT_ID=your-id M365_CLIENT_SECRET=your-secret M365_TENANT_ID=your-tenant npx celavii-m365-auth
+   M365_CLIENT_ID=your-id M365_CLIENT_SECRET=your-secret M365_TENANT_ID=your-tenant npx celavii-m365-http
    ```
-2. Open **http://localhost:3333/auth** in your browser (this is important — use this URL, not the one from the chat)
-3. Sign in with your Microsoft account
-4. You'll see a success page — tokens are saved
-5. Go back to Cowork and ask: *"Check my auth status"*
+2. Open **http://localhost:3333/auth** in your browser
+3. Sign in with your Microsoft account — you'll see a success page
+4. Go back to Claude Desktop — all M365 tools are ready
 
-> **Why not use the authenticate tool?** The `authenticate` tool generates an OAuth URL, but its CSRF state token won't match the callback server. Always use `http://localhost:3333/auth` for Cowork.
+> **Why HTTP?** Cowork/Chat run in a sandboxed environment. The HTTP server runs locally on your machine and serves both MCP protocol requests and OAuth in one process, so CSRF tokens always match.
 
 </details>
 
 <details>
-<summary><b>Chat tab</b></summary>
+<summary><b>Code tab with HTTP transport (optional)</b></summary>
 
-Same process as Cowork — credentials must be in the ZIP, and you authenticate via the terminal auth server:
+You can also use the HTTP server with the Code tab for a consistent experience:
 
-1. Run the auth server in a terminal (see Cowork instructions above)
-2. Open **http://localhost:3333/auth** in your browser
-3. Sign in, then ask Claude to check auth status
+1. Build the plugin with `--http` flag: `./build-plugin.sh --http`
+2. Install the ZIP in Claude Desktop
+3. Start the HTTP server (see Cowork/Chat instructions above)
+4. All tools work the same way
 
 </details>
 
@@ -133,6 +137,56 @@ Try asking Claude:
    - **Application (client) ID** → this is your `M365_CLIENT_ID`
    - **Client secret value** → this is your `M365_CLIENT_SECRET`
    - **Directory (tenant) ID** → this is your `M365_TENANT_ID`
+
+---
+
+## HTTP Transport (Recommended for Cowork/Chat)
+
+The HTTP server runs both the MCP protocol and OAuth authentication in a single process on your machine. This is the recommended approach for Cowork and Chat tabs, and works with Code too.
+
+### Quick Start
+
+```bash
+# Start the HTTP server (runs on port 3333)
+M365_CLIENT_ID=your-id M365_CLIENT_SECRET=your-secret npx celavii-m365-http
+```
+
+Then:
+1. Open **http://localhost:3333/auth** to authenticate
+2. In Claude Desktop, the plugin connects to `http://localhost:3333/mcp`
+
+### Why HTTP instead of stdio?
+
+| | Stdio (default) | HTTP |
+|---|---|---|
+| **How it works** | Claude launches `npx celavii-m365` as a subprocess | You start the server, Claude connects via HTTP |
+| **Code tab** | Works | Works |
+| **Cowork tab** | Auth issues (CSRF mismatch) | Works |
+| **Chat tab** | Auth issues (CSRF mismatch) | Works |
+| **Setup** | Automatic (Claude starts it) | Manual (you start the server) |
+
+### HTTP .mcp.json Configuration
+
+```json
+{
+  "mcpServers": {
+    "celavii-m365": {
+      "url": "http://localhost:3333/mcp"
+    }
+  }
+}
+```
+
+### Endpoints
+
+| Endpoint | Description |
+|----------|-------------|
+| `POST /mcp` | MCP Streamable HTTP (tool calls) |
+| `GET /mcp` | MCP SSE stream (reconnection) |
+| `DELETE /mcp` | MCP session termination |
+| `GET /auth` | Start Microsoft OAuth flow |
+| `GET /auth/callback` | OAuth redirect handler |
+| `GET /health` | Health check (JSON) |
 
 ---
 
