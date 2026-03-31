@@ -4,6 +4,7 @@
   "description": "Microsoft 365 MCP Server — Email, Calendar, OneDrive, and Power Automate integration for AI-powered IDEs. 35 tools with Zod validation, OAuth 2.0, and prompt injection protection.",
   "author": {
     "name": "Celavii",
+    "email": "engineering@celavii.com",
     "url": "https://github.com/CelaviiHQ"
   },
   "repository": "https://github.com/CelaviiHQ/celavii-m365",
@@ -17,6 +18,5 @@
     "power-automate",
     "mcp",
     "email"
-  ],
-  "mcpServers": "./.mcp.json"
+  ]
 }
