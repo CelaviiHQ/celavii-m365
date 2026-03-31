@@ -21,7 +21,9 @@ CLIENT_ID=""
 CLIENT_SECRET=""
 TENANT_ID=""
 TOKEN_PATH=""
+REFRESH_TOKEN=""
 HTTP_MODE=""
+SKILLS_ONLY=""
 
 # Parse arguments
 while [ "$#" -gt 0 ]; do
@@ -31,7 +33,10 @@ while [ "$#" -gt 0 ]; do
     --secret)          CLIENT_SECRET="$2"; shift 2 ;;
     --tenant-id)       TENANT_ID="$2"; shift 2 ;;
     --token-path)      TOKEN_PATH="$2"; shift 2 ;;
+    --refresh-token)   REFRESH_TOKEN="$2"; shift 2 ;;
+    --auto-token)      REFRESH_TOKEN="__AUTO__"; shift ;;
     --http)            HTTP_MODE="1"; shift ;;
+    --skills-only)     SKILLS_ONLY="1"; shift ;;
     -h|--help)
       echo "Usage: ./build-plugin.sh [options]"
       echo ""
@@ -104,7 +109,7 @@ if [ ! -f ".claude-plugin/plugin.json" ]; then
   exit 1
 fi
 
-if [ ! -f ".mcp.json" ]; then
+if [ -z "$SKILLS_ONLY" ] && [ ! -f ".mcp.json" ]; then
   echo "❌ Missing .mcp.json"
   exit 1
 fi
@@ -122,7 +127,14 @@ trap "rm -rf $TMPDIR" EXIT
 cp -r .claude-plugin skills "$TMPDIR/"
 
 # Generate .mcp.json with credentials (or empty defaults)
-if [ -n "$HTTP_MODE" ]; then
+if [ -n "$SKILLS_ONLY" ]; then
+  # Skills-only mode — no MCP server, tools come from a custom connector
+  cat > "$TMPDIR/.mcp.json" << EOF
+{
+  "mcpServers": {}
+}
+EOF
+elif [ -n "$HTTP_MODE" ]; then
   # HTTP transport — connect to running HTTP server
   cat > "$TMPDIR/.mcp.json" << EOF
 {
@@ -134,12 +146,33 @@ if [ -n "$HTTP_MODE" ]; then
 }
 EOF
 else
+  # Auto-extract refresh token from existing token file if requested
+  if [ "$REFRESH_TOKEN" = "__AUTO__" ]; then
+    TOKEN_FILE="${HOME}/.celavii-m365-tokens.json"
+    if [ -f "$TOKEN_FILE" ]; then
+      REFRESH_TOKEN=$(node -e "const d=JSON.parse(require('fs').readFileSync('$TOKEN_FILE','utf-8'));console.log(d.graph?.refresh_token||'')" 2>/dev/null)
+      if [ -n "$REFRESH_TOKEN" ]; then
+        echo "  ✓ Extracted refresh token from $TOKEN_FILE"
+      else
+        echo "  ⚠ No refresh token found in $TOKEN_FILE"
+        REFRESH_TOKEN=""
+      fi
+    else
+      echo "  ⚠ Token file not found at $TOKEN_FILE — authenticate first, then re-run with --auto-token"
+      REFRESH_TOKEN=""
+    fi
+  fi
+
   # Stdio transport — launch process directly
-  # Build env block — only include TOKEN_PATH if explicitly set
-  TOKEN_PATH_LINE=""
+  # Build optional env lines
+  EXTRA_ENV=""
   if [ -n "$TOKEN_PATH" ]; then
-    TOKEN_PATH_LINE=",
+    EXTRA_ENV="${EXTRA_ENV},
         \"M365_TOKEN_PATH\": \"${TOKEN_PATH}\""
+  fi
+  if [ -n "$REFRESH_TOKEN" ]; then
+    EXTRA_ENV="${EXTRA_ENV},
+        \"M365_REFRESH_TOKEN\": \"${REFRESH_TOKEN}\""
   fi
 
   cat > "$TMPDIR/.mcp.json" << EOF
@@ -151,7 +184,7 @@ else
       "env": {
         "M365_CLIENT_ID": "${CLIENT_ID}",
         "M365_CLIENT_SECRET": "${CLIENT_SECRET}",
-        "M365_TENANT_ID": "${TENANT_ID}"${TOKEN_PATH_LINE}
+        "M365_TENANT_ID": "${TENANT_ID}"${EXTRA_ENV}
       }
     }
   }

@@ -16,19 +16,37 @@ Connect Microsoft 365 to Claude — read emails, manage your calendar, browse On
 
 ---
 
-## Installation Guide
+## Quick Start
 
 ### Prerequisites
 
 - [Claude Desktop](https://claude.ai/download) installed
 - A Microsoft 365 account (work or school)
-- An Azure AD app registration (your admin may need to set this up — see [Azure Setup](#azure-ad-setup) below)
+- An Azure AD app registration ([setup guide](#azure-ad-setup))
+- Node.js 18+
 
-### Step 1: Download the Plugin
+### Option A: Cowork / Chat (recommended)
 
-**Option A** — Download the generic ZIP from the [Releases page](https://github.com/CelaviiHQ/celavii-m365/releases) (you'll configure credentials after installing).
+The Cowork and Chat tabs run MCP servers in a sandbox that can't access local files. This setup runs a persistent HTTP server on your machine and connects via a Cloudflare HTTPS tunnel.
 
-**Option B** — Build a ZIP with your credentials pre-filled:
+```bash
+git clone https://github.com/CelaviiHQ/celavii-m365.git
+cd celavii-m365
+./setup-cowork.sh
+```
+
+The script will:
+1. Prompt for your Azure AD credentials
+2. Build the MCP server and skills plugin
+3. Start an HTTP server + HTTPS tunnel
+4. Open your browser for Microsoft sign-in
+5. Print two setup steps for Claude Desktop
+
+**Requirements:** `node`, `cloudflared` (auto-installed via Homebrew if missing)
+
+### Option B: Code tab (plugin)
+
+The Code tab runs MCP servers locally with full filesystem access. A single plugin ZIP handles everything.
 
 ```bash
 git clone https://github.com/CelaviiHQ/celavii-m365.git
@@ -36,57 +54,21 @@ cd celavii-m365
 ./build-plugin.sh --client-id YOUR_CLIENT_ID --secret YOUR_SECRET --tenant-id YOUR_TENANT_ID
 ```
 
-**Option C** — Build with HTTP transport (recommended for Cowork/Chat):
+Then in Claude Desktop:
+1. **Customize** → **+** → **Upload local plugin**
+2. Select `celavii-m365-plugin.zip`
+3. Start a chat and say: *"Authenticate with Microsoft 365"*
+4. Click the auth link, sign in, and you're set
+
+### Option C: Claude Code CLI
 
 ```bash
-git clone https://github.com/CelaviiHQ/celavii-m365.git
-cd celavii-m365
-./build-plugin.sh --http
+claude mcp add --transport stdio --scope user \
+  --env M365_CLIENT_ID=YOUR_ID \
+  --env M365_CLIENT_SECRET=YOUR_SECRET \
+  --env M365_TENANT_ID=YOUR_TENANT \
+  celavii-m365 -- npx -y celavii-m365@latest
 ```
-
-This creates a plugin ZIP that connects via HTTP instead of launching a process. See [HTTP Transport](#http-transport-recommended-for-coworkchat) below.
-
-### Step 2: Install in Claude Desktop
-
-1. Open **Claude Desktop**
-2. Click the **Customize** button (bottom-left settings icon)
-3. Under **Personal plugins**, click the **+** button
-4. Select **Upload local plugin**
-5. Click **Browse files** and select the `celavii-m365-plugin.zip` you downloaded
-6. Click **Upload**
-
-The plugin will appear under "Personal plugins" with 6 skills:
-- `/celavii-m365-email` — Email management
-- `/celavii-m365-calendar` — Calendar management
-- `/celavii-m365-onedrive` — OneDrive file management
-- `/celavii-m365-organize` — Folders and inbox rules
-- `/celavii-m365-flows` — Power Automate flows
-- `/celavii-m365-setup` — Setup and troubleshooting
-
-### Step 3: Authenticate with Microsoft 365
-
-The same flow works across all Claude Desktop tabs (Code, Cowork, Chat):
-
-1. Start a new chat and ask: *"Authenticate with Microsoft 365"*
-2. Claude will return a link to **http://localhost:3333/auth** — open it in your browser
-3. Sign in with your Microsoft account
-4. You'll see a success page — return to Claude Desktop and retry your request
-
-The auth server runs embedded inside the MCP server (same process), so there are no CSRF issues.
-
-**Note (Code tab):** If credentials are empty, go to **Customize** → **Celavii M365** → **Connectors** and fill in your `M365_CLIENT_ID`, `M365_CLIENT_SECRET`, and `M365_TENANT_ID`.
-
-**Note (Cowork/Chat):** Connector settings are read-only. Build the plugin ZIP with credentials: `./build-plugin.sh --client-id YOUR_ID --secret YOUR_SECRET --tenant-id YOUR_TENANT`
-
-### Step 4: Start Using It
-
-Try asking Claude:
-
-- *"Show me my latest emails"*
-- *"What meetings do I have this week?"*
-- *"Search my OneDrive for the Q4 report"*
-- *"Draft an email to john@example.com about the project update"*
-- *"Create a calendar event for tomorrow at 2pm"*
 
 ---
 
@@ -96,7 +78,7 @@ Try asking Claude:
 
 1. Go to [Azure Portal > App registrations](https://portal.azure.com/#blade/Microsoft_AAD_RegisteredApps/ApplicationsListBlade)
 2. Click **New registration**
-3. Set a name (e.g., "Celavii M365")
+3. Set a name (e.g., "Celavii M365 MCP")
 4. Set **Redirect URI** to `http://localhost:3333/auth/callback` (Web platform)
 5. Under **Certificates & secrets**, create a new client secret — copy the **value** (not the secret ID!)
 6. Under **API permissions**, add these Microsoft Graph permissions:
@@ -105,51 +87,44 @@ Try asking Claude:
    - `Calendars.Read`, `Calendars.ReadWrite`
    - `Files.Read`, `Files.ReadWrite`
 7. Click **Grant admin consent** (or have an admin do it)
-8. Copy these three values to give to anyone installing the plugin:
-   - **Application (client) ID** → this is your `M365_CLIENT_ID`
-   - **Client secret value** → this is your `M365_CLIENT_SECRET`
-   - **Directory (tenant) ID** → this is your `M365_TENANT_ID`
+8. Copy these three values:
+   - **Application (client) ID** → `M365_CLIENT_ID`
+   - **Client secret value** → `M365_CLIENT_SECRET`
+   - **Directory (tenant) ID** → `M365_TENANT_ID`
 
 ---
 
-## HTTP Transport (Recommended for Cowork/Chat)
+## How It Works
 
-The HTTP server runs both the MCP protocol and OAuth authentication in a single process on your machine. This is the recommended approach for Cowork and Chat tabs, and works with Code too.
+### Architecture
 
-### Quick Start
+The MCP server supports two transport modes:
 
-```bash
-# Start the HTTP server (runs on port 3333)
-M365_CLIENT_ID=your-id M365_CLIENT_SECRET=your-secret npx celavii-m365-http
-```
-
-Then:
-1. Open **http://localhost:3333/auth** to authenticate
-2. In Claude Desktop, the plugin connects to `http://localhost:3333/mcp`
-
-### Why HTTP instead of stdio?
-
-| | Stdio (default) | HTTP |
+| | Stdio | HTTP Streamable |
 |---|---|---|
-| **How it works** | Claude launches `npx celavii-m365` as a subprocess | You start the server, Claude connects via HTTP |
+| **How it runs** | Claude launches `npx celavii-m365` as a subprocess | You start the server, Claude connects via HTTPS |
 | **Code tab** | Works | Works |
-| **Cowork tab** | Auth issues (CSRF mismatch) | Works |
-| **Chat tab** | Auth issues (CSRF mismatch) | Works |
-| **Setup** | Automatic (Claude starts it) | Manual (you start the server) |
+| **Cowork / Chat** | Sandbox blocks filesystem access | Works (via Cloudflare tunnel) |
+| **Auth server** | Embedded, dies between calls | Persistent, always available |
+| **Setup** | `build-plugin.sh` | `setup-cowork.sh` |
 
-### HTTP .mcp.json Configuration
+### Cowork Setup Flow
 
-```json
-{
-  "mcpServers": {
-    "celavii-m365": {
-      "url": "http://localhost:3333/mcp"
-    }
-  }
-}
+```
+./setup-cowork.sh
+       │
+       ├── npm install && npm run build (if needed)
+       ├── build-plugin.sh --skills-only → plugin ZIP (skills only, no MCP)
+       ├── Start HTTP MCP server (port 3333)
+       ├── cloudflared tunnel → https://xxx.trycloudflare.com
+       ├── Open browser for OAuth sign-in
+       │
+       └── Output:
+             1. Upload plugin ZIP for skills
+             2. Add custom connector: https://xxx.trycloudflare.com/mcp
 ```
 
-### Endpoints
+### HTTP Server Endpoints
 
 | Endpoint | Description |
 |----------|-------------|
@@ -162,64 +137,6 @@ Then:
 
 ---
 
-## Alternative Installation Methods
-
-<details>
-<summary><b>Claude Code CLI</b></summary>
-
-```bash
-claude plugin install --from github:CelaviiHQ/celavii-m365
-```
-
-Then set your Azure AD credentials in your project's `.mcp.json` and restart Claude Code.
-
-</details>
-
-<details>
-<summary><b>Cross-IDE Installer Script (Claude Code, Windsurf, Cursor)</b></summary>
-
-```bash
-git clone https://github.com/CelaviiHQ/celavii-m365.git
-cd celavii-m365
-
-# Install for all IDEs
-./install.sh all --project-dir /path/to/your/project
-
-# Or a specific IDE
-./install.sh claude --project-dir /path/to/your/project
-./install.sh windsurf --project-dir /path/to/your/project
-./install.sh cursor --project-dir /path/to/your/project
-```
-
-Then set your Azure AD credentials in the generated `.mcp.json`.
-
-</details>
-
-<details>
-<summary><b>Manual MCP Configuration</b></summary>
-
-Add to your IDE's MCP config (`.mcp.json` or Claude Desktop config):
-
-```json
-{
-  "mcpServers": {
-    "celavii-m365": {
-      "command": "npx",
-      "args": ["-y", "celavii-m365"],
-      "env": {
-        "M365_CLIENT_ID": "your-client-id",
-        "M365_CLIENT_SECRET": "your-client-secret-value",
-        "M365_TENANT_ID": "your-tenant-id"
-      }
-    }
-  }
-}
-```
-
-</details>
-
----
-
 ## Environment Variables
 
 | Variable | Required | Description |
@@ -229,7 +146,7 @@ Add to your IDE's MCP config (`.mcp.json` or Claude Desktop config):
 | `M365_TENANT_ID` | No | Azure AD tenant ID. Defaults to `common` (multi-tenant) |
 | `M365_REDIRECT_URI` | No | OAuth callback URL. Defaults to `http://localhost:3333/auth/callback` |
 | `M365_TOKEN_PATH` | No | Custom path for token storage. Defaults to `~/.celavii-m365-tokens.json` |
-| `M365_AUTH_PORT` | No | Auth server port. Defaults to `3333` |
+| `M365_AUTH_PORT` | No | HTTP server port. Defaults to `3333` |
 
 ## All 35 Tools
 
@@ -287,6 +204,14 @@ Add to your IDE's MCP config (`.mcp.json` or Claude Desktop config):
 
 </details>
 
+## Scripts
+
+| Script | Purpose |
+|--------|---------|
+| `setup-cowork.sh` | One-command Cowork/Chat setup (server + tunnel + plugin + auth) |
+| `build-plugin.sh` | Build plugin ZIP (supports `--skills-only`, `--http`, stdio modes) |
+| `install.sh` | Cross-IDE installer (Claude Code, Windsurf, Cursor) |
+
 ## Security
 
 - **Token storage**: Tokens stored with `0600` permissions (owner read/write only)
@@ -298,33 +223,35 @@ Add to your IDE's MCP config (`.mcp.json` or Claude Desktop config):
 ## Troubleshooting
 
 <details>
-<summary><b>"Invalid state parameter" / CSRF error on sign-in</b></summary>
+<summary><b>Cowork says "Not authenticated" after signing in</b></summary>
 
-This happens when you click an OAuth URL from the chat but the auth callback server has a different state token. **Fix:** Don't use the URL from the chat. Instead:
-
-1. Run `npx celavii-m365-auth` in a terminal (with your env vars)
-2. Open **http://localhost:3333/auth** in your browser
-3. This generates a matching state token and handles the callback correctly
+Cowork runs MCP servers in a sandbox without filesystem access. The stdio plugin can't read the token file. Use `setup-cowork.sh` instead, which runs a persistent HTTP server outside the sandbox and connects via a Cloudflare tunnel.
 
 </details>
 
 <details>
-<summary><b>"Plugin validation failed" when uploading ZIP</b></summary>
+<summary><b>"Failed to add connector" (HTTPS required)</b></summary>
 
-The Cowork and Chat tabs have stricter YAML validation than the Code tab. Make sure your SKILL.md frontmatter only has `name` and `description` — no `metadata`, `user-invocable`, or other custom fields.
+Claude Desktop custom connectors require HTTPS URLs. The `setup-cowork.sh` script handles this automatically using a Cloudflare tunnel. If you're running the HTTP server manually, you need to set up your own HTTPS proxy or tunnel.
 
 </details>
 
 <details>
-<summary><b>Connector credentials are read-only (Cowork/Chat)</b></summary>
+<summary><b>Auth server port already in use</b></summary>
 
-Unlike the Code tab, Cowork and Chat don't let you edit connector environment variables after installing. You must bake credentials into the ZIP:
+Another process is using port 3333. Check with `lsof -i :3333` and kill it, or set a different port: `M365_AUTH_PORT=3334 ./setup-cowork.sh ...`
 
-```bash
-./build-plugin.sh --client-id YOUR_ID --secret YOUR_SECRET --tenant-id YOUR_TENANT
-```
+</details>
 
-Then re-upload the ZIP.
+<details>
+<summary><b>Token expired or auth lost</b></summary>
+
+Tokens auto-refresh, but if they expire completely:
+
+1. Ask Claude: *"Logout from Microsoft 365"*
+2. Re-authenticate (visit `http://localhost:3333/auth` if using HTTP mode)
+
+Or delete the token file manually: `rm ~/.celavii-m365-tokens.json`
 
 </details>
 
@@ -338,18 +265,6 @@ Then re-upload the ZIP.
 
 </details>
 
-<details>
-<summary><b>Token expired or auth lost</b></summary>
-
-Tokens auto-refresh, but if they expire completely:
-
-1. Ask Claude: *"Logout from Microsoft 365"*
-2. Re-authenticate using the steps for your tab (see Step 3 above)
-
-Or delete the token file manually: `rm ~/.celavii-m365-tokens.json`
-
-</details>
-
 ---
 
 ## Development
@@ -357,34 +272,29 @@ Or delete the token file manually: `rm ~/.celavii-m365-tokens.json`
 ```bash
 cd mcp
 npm install
-npm run build
-npm run typecheck
-
-# Run locally
-M365_CLIENT_ID=xxx M365_CLIENT_SECRET=xxx node dist/index.js
-
-# Watch mode
-npm run dev
+npm run build        # Build with tsup
+npm run typecheck    # Type check
+npm run dev          # Watch mode
 ```
 
-## Architecture
-
-Built with TypeScript (strict mode, ES2022), Zod validation, modular tool registration, and ESM-only build via tsup.
+## Project Structure
 
 ```
 celavii-m365/
   .claude-plugin/       Plugin manifest
-  .mcp.json             MCP server config
-  skills/               Agent Skills (6 domain guides)
+  .mcp.json             MCP server config (template)
+  skills/               6 Agent Skills (domain guides)
+  setup-cowork.sh       Cowork/Chat one-command setup
+  build-plugin.sh       Plugin ZIP builder
   install.sh            Cross-IDE installer
-  build-plugin.sh       Generates plugin ZIP
   mcp/                  TypeScript MCP server
     src/
-      index.ts          Entry point (stdio transport)
+      index.ts          Stdio entry point + embedded auth server
+      remote/index.ts   HTTP Streamable entry point
       server.ts         Server factory + tool registration
       client.ts         GraphClient (Graph API + Flow API)
       types.ts          Shared types and constants
-      auth-server.ts    OAuth callback server
+      auth-server.ts    Standalone OAuth server
       auth/token-store.ts  Token persistence + refresh
       tools/            35 MCP tools across 7 modules
       utils/            Folder resolution + formatters
