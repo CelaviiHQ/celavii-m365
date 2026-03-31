@@ -228,6 +228,7 @@ function createMcpServer() {
     tenantId,
     redirectUri,
     tokenStorePath,
+    tokenStore,
   })
 }
 

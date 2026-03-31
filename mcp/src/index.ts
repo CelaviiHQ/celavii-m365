@@ -41,23 +41,9 @@ async function main() {
   const redirectUri = process.env.M365_REDIRECT_URI || `http://localhost:${authPort}/auth/callback`
   const tokenStorePath = process.env.M365_TOKEN_PATH || undefined
 
-  // ─── Start MCP Server (stdio) ────────────────────────────────────────
-
-  const server = createServer({
-    clientId,
-    clientSecret,
-    tenantId,
-    redirectUri,
-    tokenStorePath,
-  })
-
-  const transport = new StdioServerTransport()
-  await server.connect(transport)
-
-  // ─── Embedded Auth Server ────────────────────────────────────────────
-  // Runs alongside the stdio MCP server in the same process.
-  // This means the authenticate tool's CSRF state tokens match the
-  // callback handler — no more mismatch between separate processes.
+  // ─── Shared Token Store ───────────────────────────────────────────────
+  // One instance shared between the MCP server tools and the embedded
+  // auth server, so tokens saved by OAuth are immediately visible to tools.
 
   const authConfig: AuthConfig = {
     clientId,
@@ -68,6 +54,25 @@ async function main() {
   }
 
   const tokenStore = new TokenStore(authConfig, tokenStorePath)
+
+  // ─── Start MCP Server (stdio) ────────────────────────────────────────
+
+  const server = createServer({
+    clientId,
+    clientSecret,
+    tenantId,
+    redirectUri,
+    tokenStorePath,
+    tokenStore,
+  })
+
+  const transport = new StdioServerTransport()
+  await server.connect(transport)
+
+  // ─── Embedded Auth Server ────────────────────────────────────────────
+  // Runs alongside the stdio MCP server in the same process.
+  // This means the authenticate tool's CSRF state tokens match the
+  // callback handler — no more mismatch between separate processes.
 
   const pendingStates = new Map<string, number>()
   const STATE_TTL_MS = 10 * 60 * 1000

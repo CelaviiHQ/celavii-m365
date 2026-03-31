@@ -19,6 +19,7 @@ export interface CreateServerOptions {
   tenantId: string
   redirectUri?: string
   tokenStorePath?: string
+  tokenStore?: TokenStore
 }
 
 // ─── Server Factory ──────────────────────────────────────────────────────────
@@ -39,8 +40,8 @@ export function createServer(options: CreateServerOptions): McpServer {
     },
   )
 
-  // Initialize auth & API client
-  const tokenStore = new TokenStore(
+  // Use provided token store or create a new one
+  const tokenStore = options.tokenStore || new TokenStore(
     {
       clientId,
       clientSecret,
