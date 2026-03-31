@@ -1,16 +1,6 @@
 ---
 name: celavii-m365-calendar
 description: "Manage Outlook calendar events via Microsoft Graph API. List events by date range, create events with attendees and timezones, accept/decline invitations, cancel/delete events."
-user-invocable: true
-metadata:
-  {
-    "openclaw":
-      {
-        "emoji": "📅",
-        "requires": { "env": ["M365_CLIENT_ID", "M365_CLIENT_SECRET"] },
-        "primaryEnv": "M365_CLIENT_ID",
-      },
-  }
 ---
 
 # Celavii M365 Calendar Skill

@@ -1,16 +1,6 @@
 ---
 name: celavii-m365-onedrive
 description: "Browse, search, upload, download, and share files in OneDrive via Microsoft Graph API. Manage folders, create sharing links, and handle file operations."
-user-invocable: true
-metadata:
-  {
-    "openclaw":
-      {
-        "emoji": "📁",
-        "requires": { "env": ["M365_CLIENT_ID", "M365_CLIENT_SECRET"] },
-        "primaryEnv": "M365_CLIENT_ID",
-      },
-  }
 ---
 
 # Celavii M365 OneDrive Skill

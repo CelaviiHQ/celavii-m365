@@ -1,16 +1,6 @@
 ---
 name: celavii-m365-email
 description: "Read, search, send, draft, and manage Outlook emails via Microsoft Graph API. Supports folder filtering, search queries, HTML sanitization, CC/BCC, importance levels, and batch read/unread marking."
-user-invocable: true
-metadata:
-  {
-    "openclaw":
-      {
-        "emoji": "📧",
-        "requires": { "env": ["M365_CLIENT_ID", "M365_CLIENT_SECRET"] },
-        "primaryEnv": "M365_CLIENT_ID",
-      },
-  }
 ---
 
 # Celavii M365 Email Skill
