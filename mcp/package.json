@@ -1,0 +1,57 @@
+{
+  "name": "celavii-m365",
+  "version": "0.1.0",
+  "description": "Microsoft 365 MCP Server — Connect Outlook, Calendar, OneDrive & Power Automate to AI-powered IDEs",
+  "author": "Celavii <engineering@celavii.com>",
+  "license": "MIT",
+  "type": "module",
+  "bin": {
+    "celavii-m365": "./dist/index.js",
+    "celavii-m365-auth": "./dist/auth-server.js"
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "start": "node dist/index.js",
+    "typecheck": "tsc --noEmit",
+    "auth": "node dist/auth-server.js"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.27.1",
+    "zod": "^3.23.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "tsup": "^8.4.0",
+    "typescript": "^5.7.0"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "keywords": [
+    "mcp",
+    "microsoft-365",
+    "outlook",
+    "onedrive",
+    "calendar",
+    "power-automate",
+    "graph-api",
+    "claude",
+    "ai",
+    "ide"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/CelaviiHQ/celavii-m365.git"
+  },
+  "bugs": {
+    "url": "https://github.com/CelaviiHQ/celavii-m365/issues"
+  },
+  "homepage": "https://github.com/CelaviiHQ/celavii-m365#readme"
+}

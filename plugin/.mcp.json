@@ -1,0 +1,13 @@
+{
+  "mcpServers": {
+    "celavii-m365": {
+      "command": "npx",
+      "args": ["-y", "celavii-m365"],
+      "env": {
+        "M365_CLIENT_ID": "",
+        "M365_CLIENT_SECRET": "",
+        "M365_TENANT_ID": ""
+      }
+    }
+  }
+}
