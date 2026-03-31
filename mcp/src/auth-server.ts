@@ -1,4 +1,3 @@
-#!/usr/bin/env node
 /**
  * OAuth callback server for celavii-m365.
  *

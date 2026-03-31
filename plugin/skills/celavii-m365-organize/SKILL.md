@@ -1,6 +1,7 @@
 ---
 name: celavii-m365-organize
 description: "Organize Outlook mail with folders, rules, and email moves. Create folder hierarchies, set up auto-sort inbox rules with conditions/actions, move emails between folders, and manage rule execution order."
+user-invocable: true
 metadata:
   {
     "openclaw":

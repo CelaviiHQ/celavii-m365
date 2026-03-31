@@ -1,6 +1,7 @@
 ---
 name: celavii-m365-flows
 description: "Manage Power Automate flows via the Flow API. List environments and flows, manually trigger flows, view execution history, and enable/disable flows."
+user-invocable: true
 metadata:
   {
     "openclaw":

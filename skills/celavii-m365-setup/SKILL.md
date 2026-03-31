@@ -1,6 +1,7 @@
 ---
 name: celavii-m365-setup
 description: "Set up and troubleshoot Microsoft 365 MCP authentication. OAuth flow, Azure AD app registration, token management, and common error resolution."
+user-invocable: true
 metadata:
   {
     "openclaw":
