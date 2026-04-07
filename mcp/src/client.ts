@@ -68,43 +68,59 @@ export class GraphClient {
       ...(body ? { body: JSON.stringify(body) } : {}),
     })
 
-    // Handle 202 Accepted (deferred send, etc.) and 204 No Content (delete, etc.)
-    if (res.status === 202 || res.status === 204) return {}
-
-    // Handle download redirects
+    // Handle download redirects (302 with Location header)
     if (res.status === 302) {
       const location = res.headers.get('location')
       if (location) return { downloadUrl: location }
     }
 
-    let json: unknown
-    try {
-      json = await res.json()
-    } catch {
+    // Parse body — Graph API returns empty bodies for 202 (send/accept/decline/cancel)
+    // and 204 (delete). Check Content-Length and content-type before parsing.
+    const contentType = res.headers.get('content-type') || ''
+    const contentLength = res.headers.get('content-length')
+    const hasJsonBody = contentType.includes('application/json') && contentLength !== '0'
+
+    let json: unknown = {}
+
+    if (hasJsonBody) {
+      try {
+        json = await res.json()
+      } catch {
+        // If response is OK but unparseable, return empty (e.g., 202 with no body)
+        if (res.ok) return {}
+        throw new GraphApiError(
+          `HTTP ${res.status}: Failed to parse response`,
+          'PARSE_ERROR',
+          res.status,
+        )
+      }
+    } else if (!res.ok) {
+      // Error with non-JSON body — try to read as text for diagnostics
+      const text = await res.text().catch(() => '')
       throw new GraphApiError(
-        `HTTP ${res.status}: Failed to parse response`,
-        'PARSE_ERROR',
+        text || `HTTP ${res.status}`,
+        'UNKNOWN_ERROR',
         res.status,
       )
     }
 
-    if (!res.ok) {
-      const err = json as { error?: { code?: string; message?: string } }
-      const msg = err?.error?.message || `HTTP ${res.status}`
-      const code = err?.error?.code || 'UNKNOWN_ERROR'
+    // Successful empty responses (202 Accepted, 204 No Content)
+    if (res.ok) return json
 
-      if (res.status === 401) {
-        throw new GraphApiError(
-          'Authentication expired. Please re-authenticate.',
-          'UNAUTHORIZED',
-          401,
-        )
-      }
+    // Error responses with JSON body
+    const err = json as { error?: { code?: string; message?: string } }
+    const msg = err?.error?.message || `HTTP ${res.status}`
+    const code = err?.error?.code || 'UNKNOWN_ERROR'
 
-      throw new GraphApiError(msg, code, res.status)
+    if (res.status === 401) {
+      throw new GraphApiError(
+        'Authentication expired. Please re-authenticate.',
+        'UNAUTHORIZED',
+        401,
+      )
     }
 
-    return json
+    throw new GraphApiError(msg, code, res.status)
   }
 
   // ─── Graph API Methods ─────────────────────────────────────────────────
