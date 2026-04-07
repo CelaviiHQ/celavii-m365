@@ -68,8 +68,8 @@ export class GraphClient {
       ...(body ? { body: JSON.stringify(body) } : {}),
     })
 
-    // Handle 204 No Content (successful delete, etc.)
-    if (res.status === 204) return {}
+    // Handle 202 Accepted (deferred send, etc.) and 204 No Content (delete, etc.)
+    if (res.status === 202 || res.status === 204) return {}
 
     // Handle download redirects
     if (res.status === 302) {
