@@ -241,7 +241,7 @@ export function registerEmailTools(server: McpServer, client: GraphClient) {
     {
       title: 'Send Email',
       description:
-        'Compose and send an email via Microsoft 365. Supports multiple recipients, CC/BCC, HTML content (auto-detected), and importance levels. This action cannot be undone.',
+        'Compose and send an email via Microsoft 365. Supports multiple recipients, CC/BCC, HTML content (auto-detected), importance levels, and scheduled sending. Use send_at to schedule delivery at a future time. This action cannot be undone once sent.',
       inputSchema: z.object({
         to: z
           .array(z.string())
@@ -260,6 +260,10 @@ export function registerEmailTools(server: McpServer, client: GraphClient) {
           .enum(['low', 'normal', 'high'])
           .optional()
           .describe('Email importance level. Defaults to normal.'),
+        send_at: z
+          .string()
+          .optional()
+          .describe('Schedule send time in ISO 8601 UTC format (e.g., "2026-04-08T13:00:00Z" for 9am EST). If provided, creates a draft with deferred delivery — Exchange sends it automatically at the specified time. Convert user timezone to UTC before passing.'),
       }),
       annotations: {
         readOnlyHint: false,
@@ -271,7 +275,7 @@ export function registerEmailTools(server: McpServer, client: GraphClient) {
     async (args) => {
       const isHtml = /<[a-z][\s\S]*>/i.test(args.body)
 
-      const message = {
+      const message: Record<string, unknown> = {
         subject: args.subject,
         body: {
           contentType: isHtml ? 'HTML' : 'Text',
@@ -297,10 +301,71 @@ export function registerEmailTools(server: McpServer, client: GraphClient) {
         ...(args.importance ? { importance: args.importance } : {}),
       }
 
+      // Scheduled send: create draft with deferred send time, then send
+      if (args.send_at) {
+        message.singleValueExtendedProperties = [
+          { id: 'SystemTime 0x3FEF', value: args.send_at },
+        ]
+        const draft = (await client.graphPost('/me/messages', message)) as { id: string }
+        await client.graphPost(`/me/messages/${encodeURIComponent(draft.id)}/send`)
+        return actionResponse(
+          `Email scheduled for ${args.send_at}. It will be sent automatically by Exchange.\nTo cancel before send time, delete draft ID: ${draft.id}`,
+          { scheduled: true, send_at: args.send_at, id: draft.id, to: args.to, subject: args.subject },
+        )
+      }
+
       await client.graphPost('/me/sendMail', { message })
       return actionResponse(
         `Email sent successfully to ${args.to.join(', ')}.`,
         { sent: true, to: args.to, subject: args.subject },
+      )
+    },
+  )
+
+  // ─── Send Draft ─────────────────────────────────────────────────────
+
+  server.registerTool(
+    'm365_send_draft',
+    {
+      title: 'Send Draft Email',
+      description:
+        'Send an existing draft email from the Drafts folder. Optionally schedule it for a future send time. Use m365_list_emails with folder "drafts" to find draft IDs.',
+      inputSchema: z.object({
+        id: z.string().describe('The draft message ID to send. Get this from m365_list_emails with folder "drafts".'),
+        send_at: z
+          .string()
+          .optional()
+          .describe('Schedule send time in ISO 8601 UTC format (e.g., "2026-04-08T13:00:00Z" for 9am EST). If provided, Exchange holds the email and sends it at the specified time. Convert user timezone to UTC before passing.'),
+      }),
+      annotations: {
+        readOnlyHint: false,
+        destructiveHint: false,
+        idempotentHint: false,
+        openWorldHint: true,
+      },
+    },
+    async (args) => {
+      // If scheduling, set the deferred send time property first
+      if (args.send_at) {
+        await client.graphPatch(`/me/messages/${encodeURIComponent(args.id)}`, {
+          singleValueExtendedProperties: [
+            { id: 'SystemTime 0x3FEF', value: args.send_at },
+          ],
+        })
+      }
+
+      await client.graphPost(`/me/messages/${encodeURIComponent(args.id)}/send`)
+
+      if (args.send_at) {
+        return actionResponse(
+          `Draft scheduled for delivery at ${args.send_at}. Exchange will send it automatically.`,
+          { scheduled: true, send_at: args.send_at, id: args.id },
+        )
+      }
+
+      return actionResponse(
+        'Draft sent successfully.',
+        { sent: true, id: args.id },
       )
     },
   )

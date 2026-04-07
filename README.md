@@ -194,61 +194,91 @@ The quick tunnel (`setup-cowork.sh`) generates a random URL that changes on ever
 
 5. **Set the connector URL in Claude Desktop** to `https://mcp.yourdomain.com/mcp` — this URL never changes.
 
-> **Optional:** Install cloudflared as a [macOS launch agent](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/configure-tunnels/local-management/as-a-service/macos/) to auto-start the tunnel on login.
+### Run on Startup (macOS)
 
-## All 35 Tools
+To keep the MCP server and tunnel running across restarts, install them as macOS Launch Agents:
+
+```bash
+./install-service.sh \
+  --client-id YOUR_CLIENT_ID \
+  --secret YOUR_CLIENT_SECRET \
+  --tenant-id YOUR_TENANT_ID \
+  --hostname mcp.yourdomain.com \
+  --tunnel-id YOUR_TUNNEL_ID
+```
+
+This creates two launch agents that auto-start on login and restart if they crash:
+- `com.celavii.m365-mcp` — HTTP MCP server on port 3333
+- `com.celavii.m365-tunnel` — Cloudflare named tunnel
+
+To manage them:
+```bash
+# View logs
+tail -f ~/.celavii-m365-mcp.log
+tail -f ~/.celavii-m365-tunnel.log
+
+# Stop
+launchctl unload ~/Library/LaunchAgents/com.celavii.m365-mcp.plist
+launchctl unload ~/Library/LaunchAgents/com.celavii.m365-tunnel.plist
+
+# Uninstall
+./install-service.sh --uninstall
+```
+
+## All 37 Tools
 
 <details>
 <summary><b>Click to expand full tool list</b></summary>
 
-### Email (6 tools)
-- **list_emails** — List emails with folder, count, skip, unread filters
-- **search_emails** — Search by query, sender, subject, attachments, read status
-- **read_email** — Read full email content (HTML auto-sanitized for security)
-- **send_email** — Send with To/CC/BCC, HTML auto-detection, importance levels
-- **draft_email** — Create draft without sending
-- **mark_as_read** — Mark one or more emails as read/unread
+### Email (7 tools)
+- **m365_list_emails** — List emails with folder, count, skip, unread filters
+- **m365_search_emails** — Search by query, sender, subject, attachments, read status
+- **m365_read_email** — Read full email content (HTML auto-sanitized for security)
+- **m365_send_email** — Send with To/CC/BCC, HTML auto-detection, importance, scheduled send
+- **m365_draft_email** — Create draft without sending
+- **m365_send_draft** — Send an existing draft, optionally at a scheduled time
+- **m365_mark_as_read** — Mark one or more emails as read/unread
 
 ### Calendar (6 tools)
-- **list_events** — List events in a date range (default: next 30 days)
-- **create_event** — Create with attendees, location, all-day, timezone
-- **accept_event** — Accept invitation with optional comment
-- **decline_event** — Decline invitation with optional comment
-- **cancel_event** — Cancel your event, notify attendees
-- **delete_event** — Permanently delete an event
+- **m365_list_events** — List events in a date range (default: next 30 days)
+- **m365_create_event** — Create with attendees, location, all-day, timezone
+- **m365_accept_event** — Accept invitation with optional comment
+- **m365_decline_event** — Decline invitation with optional comment
+- **m365_cancel_event** — Cancel your event, notify attendees
+- **m365_delete_event** — Permanently delete an event
 
 ### OneDrive (7 tools)
-- **onedrive_list** — Browse files and folders by path
-- **onedrive_search** — Search files by name or content
-- **onedrive_download** — Get temporary download URL
-- **onedrive_upload** — Upload files (text or base64)
-- **onedrive_share** — Create sharing links (view/edit/embed)
-- **onedrive_create_folder** — Create folders
-- **onedrive_delete** — Delete files or folders
+- **m365_onedrive_list** — Browse files and folders by path
+- **m365_onedrive_search** — Search files by name or content
+- **m365_onedrive_download** — Get temporary download URL
+- **m365_onedrive_upload** — Upload files (text or base64)
+- **m365_onedrive_share** — Create sharing links (view/edit/embed)
+- **m365_onedrive_create_folder** — Create folders
+- **m365_onedrive_delete** — Delete files or folders
 
 ### Mail Folders (3 tools)
-- **list_folders** — List folders with item/unread counts
-- **create_folder** — Create folder (supports nesting)
-- **move_emails** — Move emails between folders
+- **m365_list_folders** — List folders with item/unread counts
+- **m365_create_folder** — Create folder (supports nesting)
+- **m365_move_emails** — Move emails between folders
 
 ### Inbox Rules (4 tools)
-- **list_rules** — List rules with conditions and actions
-- **create_rule** — Create rules (from, subject, attachments triggers)
-- **update_rule_sequence** — Change rule execution order
-- **delete_rule** — Delete a rule
+- **m365_list_rules** — List rules with conditions and actions
+- **m365_create_rule** — Create rules (from, subject, attachments triggers)
+- **m365_update_rule_sequence** — Change rule execution order
+- **m365_delete_rule** — Delete a rule
 
 ### Power Automate (5 tools)
-- **flow_list_environments** — List Power Platform environments
-- **flow_list** — List flows in an environment
-- **flow_run** — Trigger a manual flow
-- **flow_list_runs** — View flow execution history
-- **flow_toggle** — Enable or disable a flow
+- **m365_flow_list_environments** — List Power Platform environments
+- **m365_flow_list** — List flows in an environment
+- **m365_flow_run** — Trigger a manual flow
+- **m365_flow_list_runs** — View flow execution history
+- **m365_flow_toggle** — Enable or disable a flow
 
 ### Auth (4 tools)
-- **authenticate** — Start OAuth flow
-- **check_auth_status** — Verify token validity
-- **logout** — Clear stored tokens
-- **about** — Server info and capabilities
+- **m365_authenticate** — Start OAuth flow
+- **m365_check_auth_status** — Verify token validity
+- **m365_logout** — Clear stored tokens
+- **m365_about** — Server info and capabilities
 
 </details>
 
@@ -257,6 +287,7 @@ The quick tunnel (`setup-cowork.sh`) generates a random URL that changes on ever
 | Script | Purpose |
 |--------|---------|
 | `setup-cowork.sh` | One-command Cowork/Chat setup (server + tunnel + plugin + auth) |
+| `install-service.sh` | Install as macOS Launch Agents (auto-start on login, persistent) |
 | `build-plugin.sh` | Build plugin ZIP (supports `--skills-only`, `--http`, stdio modes) |
 | `install.sh` | Cross-IDE installer (Claude Code, Windsurf, Cursor) |
 

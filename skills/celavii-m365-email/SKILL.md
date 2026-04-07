@@ -86,8 +86,11 @@ Compose and send an email.
 | `cc` | string[] | No | Array of CC addresses. |
 | `bcc` | string[] | No | Array of BCC addresses. |
 | `importance` | string | No | `low`, `normal`, or `high`. Defaults to `normal`. |
+| `send_at` | string | No | Schedule delivery at a future time. ISO 8601 UTC format (e.g., `"2026-04-08T13:00:00Z"`). |
 
 **HTML auto-detection**: If the body contains HTML tags (e.g., `<p>`, `<div>`, `<html>`), it's automatically sent as HTML. Otherwise sent as plain text.
+
+**Scheduled send**: If `send_at` is provided, the email is created as a draft with a deferred delivery time — Exchange sends it automatically at the specified time. The user can cancel by deleting the draft before the send time.
 
 **Important**: Always confirm with the user before sending emails. Read back the recipient(s), subject, and body for confirmation.
 
@@ -103,7 +106,20 @@ Create a draft email without sending it. Saved to the Drafts folder.
 | `cc` | string[] | No | Array of CC addresses. |
 | `importance` | string | No | `low`, `normal`, or `high`. |
 
-**Returns**: The draft message ID (can be used to send later via Graph API).
+**Returns**: The draft message ID (can be used with `m365_send_draft` to send or schedule later).
+
+### m365_send_draft
+
+Send an existing draft email, optionally at a scheduled time.
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `id` | string | Yes | The draft message ID (from `m365_list_emails` with folder `"drafts"`). |
+| `send_at` | string | No | ISO 8601 UTC datetime for scheduled delivery (e.g., `"2026-04-08T13:00:00Z"`). |
+
+**How scheduled send works**: Sets the `PidTagDeferredSendTime` MAPI property on the draft, then tells Exchange to send it. Exchange holds the message and delivers it at the specified time.
+
+**To cancel a scheduled email**: Delete the draft before the send time using its message ID.
 
 ### m365_mark_as_read
 
@@ -131,7 +147,24 @@ Mark one or more emails as read or unread.
 ### Draft review workflow
 1. `m365_draft_email` to create the draft
 2. User reviews in Outlook
-3. User sends from Outlook when ready
+3. User sends from Outlook, or use `m365_send_draft` to send via Claude
+
+### Schedule send existing drafts
+1. `m365_list_emails` with `folder: "drafts"` to list current drafts
+2. Confirm with user which drafts to schedule and the desired send time
+3. **Ask for timezone** — the user will say times like "9am EST". Convert to UTC before calling the tool:
+   - EST (UTC-5): 9:00 AM EST = `14:00:00Z`
+   - CST (UTC-6): 9:00 AM CST = `15:00:00Z`
+   - PST (UTC-8): 9:00 AM PST = `17:00:00Z`
+   - During daylight saving: EDT (UTC-4), CDT (UTC-5), PDT (UTC-7)
+4. `m365_send_draft` with `send_at` in ISO 8601 UTC for each draft
+5. Confirm the scheduled time back to the user in their timezone
+
+### Schedule send a new email
+1. Compose the email with the user (to, subject, body, etc.)
+2. Ask when they want it delivered and in what timezone
+3. `m365_send_email` with `send_at` parameter (UTC)
+4. To cancel: the response includes a draft ID — delete it before the scheduled time
 
 ## Pagination
 
