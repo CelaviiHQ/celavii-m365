@@ -26,6 +26,29 @@ export interface TokenPair {
   flow?: TokenSet
 }
 
+// ─── Multi-Account Storage ───────────────────────────────────────────────────
+
+/** Tokens for a single M365 account (graph + optional flow). */
+export interface AccountTokens {
+  graph: TokenSet
+  flow?: TokenSet
+  /** Microsoft Graph `/me` snapshot captured at auth time. */
+  identity?: {
+    id: string
+    displayName?: string
+    mail?: string
+    userPrincipalName?: string
+  }
+}
+
+/** On-disk schema for the multi-account token file. */
+export interface MultiAccountStore {
+  /** Account ID (email/UPN) of the default account, or null if no accounts. */
+  default: string | null
+  /** Map of account ID → tokens. Keys are lowercased UPN/email. */
+  accounts: Record<string, AccountTokens>
+}
+
 export interface AuthConfig {
   clientId: string
   clientSecret: string

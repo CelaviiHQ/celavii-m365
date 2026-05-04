@@ -5,6 +5,11 @@ import type { CalendarEvent } from '../types.js'
 import { CALENDAR_SELECT_FIELDS } from '../types.js'
 import { formatEvent, textResponse, paginatedResponse, actionResponse } from '../utils/formatting.js'
 
+const accountIdField = z
+  .string()
+  .optional()
+  .describe('Email/UPN of the M365 account to target. Defaults to the configured default account.')
+
 export function registerCalendarTools(server: McpServer, client: GraphClient) {
   // ─── List Events ─────────────────────────────────────────────────────
 
@@ -34,6 +39,7 @@ export function registerCalendarTools(server: McpServer, client: GraphClient) {
           .enum(['text', 'json'])
           .optional()
           .describe("Output format: 'text' for human-readable (default), 'json' for structured data."),
+        account_id: accountIdField,
       }),
       annotations: {
         readOnlyHint: true,
@@ -59,6 +65,7 @@ export function registerCalendarTools(server: McpServer, client: GraphClient) {
           $select: CALENDAR_SELECT_FIELDS,
         },
         count,
+        args.account_id,
       )) as CalendarEvent[]
 
       if (events.length === 0) {
@@ -95,6 +102,7 @@ export function registerCalendarTools(server: McpServer, client: GraphClient) {
           .string()
           .optional()
           .describe('IANA timezone for the event (e.g., "America/Chicago", "America/New_York"). Defaults to UTC.'),
+        account_id: accountIdField,
       }),
       annotations: {
         readOnlyHint: false,
@@ -126,7 +134,10 @@ export function registerCalendarTools(server: McpServer, client: GraphClient) {
         }))
       }
 
-      const result = (await client.graphPost('/me/events', event)) as { id: string; webLink?: string }
+      const result = (await client.graphPost('/me/events', event, args.account_id)) as {
+        id: string
+        webLink?: string
+      }
 
       const lines = [`Event created successfully.`, `ID: ${result.id}`]
       if (result.webLink) lines.push(`Link: ${result.webLink}`)
@@ -152,6 +163,7 @@ export function registerCalendarTools(server: McpServer, client: GraphClient) {
           .boolean()
           .optional()
           .describe('Whether to send a response to the organizer. Defaults to true.'),
+        account_id: accountIdField,
       }),
       annotations: {
         readOnlyHint: false,
@@ -161,10 +173,14 @@ export function registerCalendarTools(server: McpServer, client: GraphClient) {
       },
     },
     async (args) => {
-      await client.graphPost(`/me/events/${encodeURIComponent(args.id)}/accept`, {
-        comment: args.comment || '',
-        sendResponse: args.send_response !== false,
-      })
+      await client.graphPost(
+        `/me/events/${encodeURIComponent(args.id)}/accept`,
+        {
+          comment: args.comment || '',
+          sendResponse: args.send_response !== false,
+        },
+        args.account_id,
+      )
       return actionResponse('Event accepted.', { accepted: true, id: args.id })
     },
   )
@@ -186,6 +202,7 @@ export function registerCalendarTools(server: McpServer, client: GraphClient) {
           .boolean()
           .optional()
           .describe('Whether to send a response to the organizer. Defaults to true.'),
+        account_id: accountIdField,
       }),
       annotations: {
         readOnlyHint: false,
@@ -195,10 +212,14 @@ export function registerCalendarTools(server: McpServer, client: GraphClient) {
       },
     },
     async (args) => {
-      await client.graphPost(`/me/events/${encodeURIComponent(args.id)}/decline`, {
-        comment: args.comment || '',
-        sendResponse: args.send_response !== false,
-      })
+      await client.graphPost(
+        `/me/events/${encodeURIComponent(args.id)}/decline`,
+        {
+          comment: args.comment || '',
+          sendResponse: args.send_response !== false,
+        },
+        args.account_id,
+      )
       return actionResponse('Event declined.', { declined: true, id: args.id })
     },
   )
@@ -216,6 +237,7 @@ export function registerCalendarTools(server: McpServer, client: GraphClient) {
           .string()
           .optional()
           .describe('Optional cancellation message sent to attendees.'),
+        account_id: accountIdField,
       }),
       annotations: {
         readOnlyHint: false,
@@ -225,9 +247,11 @@ export function registerCalendarTools(server: McpServer, client: GraphClient) {
       },
     },
     async (args) => {
-      await client.graphPost(`/me/events/${encodeURIComponent(args.id)}/cancel`, {
-        comment: args.comment || '',
-      })
+      await client.graphPost(
+        `/me/events/${encodeURIComponent(args.id)}/cancel`,
+        { comment: args.comment || '' },
+        args.account_id,
+      )
       return actionResponse('Event cancelled. Attendees have been notified.', { cancelled: true, id: args.id })
     },
   )
@@ -241,6 +265,7 @@ export function registerCalendarTools(server: McpServer, client: GraphClient) {
       description: 'Permanently delete a calendar event from Microsoft 365. This action cannot be undone. Use m365_cancel_event instead if you want to notify attendees.',
       inputSchema: z.object({
         id: z.string().describe('The event ID to delete.'),
+        account_id: accountIdField,
       }),
       annotations: {
         readOnlyHint: false,
@@ -250,7 +275,7 @@ export function registerCalendarTools(server: McpServer, client: GraphClient) {
       },
     },
     async (args) => {
-      await client.graphDelete(`/me/events/${encodeURIComponent(args.id)}`)
+      await client.graphDelete(`/me/events/${encodeURIComponent(args.id)}`, args.account_id)
       return actionResponse('Event deleted.', { deleted: true, id: args.id })
     },
   )

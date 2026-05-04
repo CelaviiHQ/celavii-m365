@@ -94,7 +94,8 @@ async function main() {
     }
   }
 
-  function successPage(): string {
+  function successPage(accountId?: string): string {
+    const safeAccount = (accountId || '').replace(/</g, '&lt;').replace(/>/g, '&gt;')
     return `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -105,6 +106,7 @@ async function main() {
     .card { text-align: center; padding: 3rem; border-radius: 1rem; background: #1e293b; max-width: 480px; }
     h1 { color: #22c55e; margin-bottom: 0.5rem; }
     p { color: #94a3b8; line-height: 1.6; }
+    .account { background: #334155; padding: 0.5rem 1rem; border-radius: 0.5rem; font-family: ui-monospace, monospace; color: #22c55e; margin: 1rem 0; display: inline-block; }
     code { background: #334155; padding: 0.2rem 0.5rem; border-radius: 0.25rem; font-size: 0.9rem; }
   </style>
 </head>
@@ -112,6 +114,7 @@ async function main() {
   <div class="card">
     <h1>Authenticated</h1>
     <p>Your Microsoft 365 account has been connected successfully.</p>
+    ${safeAccount ? `<div class="account">${safeAccount}</div>` : ''}
     <p>You can close this tab and return to Claude Desktop.</p>
     <p style="margin-top: 2rem; font-size: 0.85rem;">Tokens stored at <code>~/.celavii-m365-tokens.json</code></p>
   </div>
@@ -154,14 +157,20 @@ async function main() {
       const state = crypto.randomUUID()
       pendingStates.set(state, Date.now())
 
+      const loginHint = url.searchParams.get('login_hint') || undefined
+
       const params = new URLSearchParams({
         client_id: authConfig.clientId,
         response_type: 'code',
         redirect_uri: authConfig.redirectUri,
         response_mode: 'query',
-        scope: [...authConfig.scopes, 'offline_access'].join(' '),
+        scope: [...authConfig.scopes, 'openid', 'profile', 'offline_access'].join(' '),
         state,
+        // Force account picker so users with multiple signed-in accounts
+        // explicitly choose which to grant.
+        prompt: 'select_account',
       })
+      if (loginHint) params.set('login_hint', loginHint)
 
       const authUrl = `https://login.microsoftonline.com/${authConfig.tenantId}/oauth2/v2.0/authorize?${params}`
       res.writeHead(302, { Location: authUrl })
@@ -196,9 +205,9 @@ async function main() {
       }
 
       try {
-        await tokenStore.exchangeCode(code)
+        const accountId = await tokenStore.exchangeCode(code)
         res.writeHead(200, { 'Content-Type': 'text/html' })
-        res.end(successPage())
+        res.end(successPage(accountId))
       } catch (err) {
         const msg = err instanceof Error ? err.message : 'Unknown error'
         res.writeHead(500, { 'Content-Type': 'text/html' })

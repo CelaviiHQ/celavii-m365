@@ -124,24 +124,30 @@ export class GraphClient {
   }
 
   // ─── Graph API Methods ─────────────────────────────────────────────────
+  // All methods accept an optional `accountId`. When omitted, the configured
+  // default account is used. When provided, must match an authenticated account.
 
-  async graphGet(path: string, queryParams?: Record<string, string>): Promise<unknown> {
-    const token = await this.tokenStore.getGraphToken()
+  async graphGet(
+    path: string,
+    queryParams?: Record<string, string>,
+    accountId?: string,
+  ): Promise<unknown> {
+    const token = await this.tokenStore.getGraphToken(accountId)
     return this.request(GRAPH_API_BASE, token, 'GET', path, undefined, queryParams)
   }
 
-  async graphPost(path: string, body?: unknown): Promise<unknown> {
-    const token = await this.tokenStore.getGraphToken()
+  async graphPost(path: string, body?: unknown, accountId?: string): Promise<unknown> {
+    const token = await this.tokenStore.getGraphToken(accountId)
     return this.request(GRAPH_API_BASE, token, 'POST', path, body)
   }
 
-  async graphPatch(path: string, body: unknown): Promise<unknown> {
-    const token = await this.tokenStore.getGraphToken()
+  async graphPatch(path: string, body: unknown, accountId?: string): Promise<unknown> {
+    const token = await this.tokenStore.getGraphToken(accountId)
     return this.request(GRAPH_API_BASE, token, 'PATCH', path, body)
   }
 
-  async graphDelete(path: string): Promise<unknown> {
-    const token = await this.tokenStore.getGraphToken()
+  async graphDelete(path: string, accountId?: string): Promise<unknown> {
+    const token = await this.tokenStore.getGraphToken(accountId)
     return this.request(GRAPH_API_BASE, token, 'DELETE', path)
   }
 
@@ -150,11 +156,12 @@ export class GraphClient {
     path: string,
     queryParams?: Record<string, string>,
     maxCount = 50,
+    accountId?: string,
   ): Promise<unknown[]> {
     const items: unknown[] = []
     let nextUrl: string | undefined
 
-    const token = await this.tokenStore.getGraphToken()
+    const token = await this.tokenStore.getGraphToken(accountId)
     const result = (await this.request(GRAPH_API_BASE, token, 'GET', path, undefined, queryParams)) as {
       value?: unknown[]
       '@odata.nextLink'?: string
@@ -167,7 +174,7 @@ export class GraphClient {
       const res = await fetch(nextUrl, {
         headers: {
           Authorization: `Bearer ${token}`,
-          'User-Agent': 'celavii-m365/0.1.0',
+          'User-Agent': 'celavii-m365/0.5.0',
         },
       })
       const page = (await res.json()) as { value?: unknown[]; '@odata.nextLink'?: string }
@@ -179,8 +186,8 @@ export class GraphClient {
   }
 
   /** Get a pre-authenticated download URL for a OneDrive item. */
-  async graphGetDownloadUrl(path: string): Promise<string> {
-    const token = await this.tokenStore.getGraphToken()
+  async graphGetDownloadUrl(path: string, accountId?: string): Promise<string> {
+    const token = await this.tokenStore.getGraphToken(accountId)
     const url = `${GRAPH_API_BASE}${path}`
 
     const res = await fetch(url, {
@@ -203,18 +210,18 @@ export class GraphClient {
 
   // ─── Flow API Methods ─────────────────────────────────────────────────
 
-  async flowGet(path: string): Promise<unknown> {
-    const token = await this.tokenStore.getFlowToken()
+  async flowGet(path: string, accountId?: string): Promise<unknown> {
+    const token = await this.tokenStore.getFlowToken(accountId)
     return this.request(FLOW_API_BASE, token, 'GET', path)
   }
 
-  async flowPost(path: string, body?: unknown): Promise<unknown> {
-    const token = await this.tokenStore.getFlowToken()
+  async flowPost(path: string, body?: unknown, accountId?: string): Promise<unknown> {
+    const token = await this.tokenStore.getFlowToken(accountId)
     return this.request(FLOW_API_BASE, token, 'POST', path, body)
   }
 
-  async flowPatch(path: string, body: unknown): Promise<unknown> {
-    const token = await this.tokenStore.getFlowToken()
+  async flowPatch(path: string, body: unknown, accountId?: string): Promise<unknown> {
+    const token = await this.tokenStore.getFlowToken(accountId)
     return this.request(FLOW_API_BASE, token, 'PATCH', path, body)
   }
 }

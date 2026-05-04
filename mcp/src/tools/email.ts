@@ -7,6 +7,11 @@ import { EMAIL_SELECT_FIELDS, EMAIL_DETAIL_FIELDS, DEFAULT_PAGE_SIZE, MAX_RESULT
 import { resolveMailFolderPath } from '../utils/folders.js'
 import { formatEmail, textResponse, paginatedResponse, actionResponse, batchResponse } from '../utils/formatting.js'
 
+const accountIdField = z
+  .string()
+  .optional()
+  .describe('Email/UPN of the M365 account to target. Defaults to the configured default account.')
+
 export function registerEmailTools(server: McpServer, client: GraphClient) {
   // ─── List Emails ─────────────────────────────────────────────────────
 
@@ -42,6 +47,7 @@ export function registerEmailTools(server: McpServer, client: GraphClient) {
           .enum(['text', 'json'])
           .optional()
           .describe("Output format: 'text' for human-readable (default), 'json' for structured data."),
+        account_id: accountIdField,
       }),
       annotations: {
         readOnlyHint: true,
@@ -64,7 +70,7 @@ export function registerEmailTools(server: McpServer, client: GraphClient) {
       if (skip) queryParams.$skip = String(skip)
       if (args.unread_only) queryParams.$filter = 'isRead eq false'
 
-      const emails = (await client.graphGetPaginated(path, queryParams, count)) as EmailMessage[]
+      const emails = (await client.graphGetPaginated(path, queryParams, count, args.account_id)) as EmailMessage[]
       // Graph doesn't reliably return total count, so estimate based on whether we got a full page
       const total = emails.length < count ? skip + emails.length : skip + emails.length + 1
 
@@ -120,6 +126,7 @@ export function registerEmailTools(server: McpServer, client: GraphClient) {
           .enum(['text', 'json'])
           .optional()
           .describe("Output format: 'text' for human-readable (default), 'json' for structured data."),
+        account_id: accountIdField,
       }),
       annotations: {
         readOnlyHint: true,
@@ -159,7 +166,7 @@ export function registerEmailTools(server: McpServer, client: GraphClient) {
         queryParams.$search = `"${escapeOData(args.query)}"`
       }
 
-      const emails = (await client.graphGetPaginated(path, queryParams, count)) as EmailMessage[]
+      const emails = (await client.graphGetPaginated(path, queryParams, count, args.account_id)) as EmailMessage[]
 
       if (emails.length === 0) {
         return textResponse('No emails matching your search criteria.')
@@ -183,6 +190,7 @@ export function registerEmailTools(server: McpServer, client: GraphClient) {
           .boolean()
           .optional()
           .describe('If true, include the raw HTML body in addition to sanitized text. Use with caution.'),
+        account_id: accountIdField,
       }),
       annotations: {
         readOnlyHint: true,
@@ -192,9 +200,11 @@ export function registerEmailTools(server: McpServer, client: GraphClient) {
       },
     },
     async (args) => {
-      const email = (await client.graphGet(`/me/messages/${encodeURIComponent(args.id)}`, {
-        $select: EMAIL_DETAIL_FIELDS,
-      })) as EmailMessage
+      const email = (await client.graphGet(
+        `/me/messages/${encodeURIComponent(args.id)}`,
+        { $select: EMAIL_DETAIL_FIELDS },
+        args.account_id,
+      )) as EmailMessage
 
       const lines = [
         `Subject: ${email.subject}`,
@@ -264,6 +274,7 @@ export function registerEmailTools(server: McpServer, client: GraphClient) {
           .string()
           .optional()
           .describe('Schedule send time in ISO 8601 UTC format (e.g., "2026-04-08T13:00:00Z" for 9am EST). If provided, creates a draft with deferred delivery — Exchange sends it automatically at the specified time. Convert user timezone to UTC before passing.'),
+        account_id: accountIdField,
       }),
       annotations: {
         readOnlyHint: false,
@@ -306,15 +317,15 @@ export function registerEmailTools(server: McpServer, client: GraphClient) {
         message.singleValueExtendedProperties = [
           { id: 'SystemTime 0x3FEF', value: args.send_at },
         ]
-        const draft = (await client.graphPost('/me/messages', message)) as { id: string }
-        await client.graphPost(`/me/messages/${encodeURIComponent(draft.id)}/send`)
+        const draft = (await client.graphPost('/me/messages', message, args.account_id)) as { id: string }
+        await client.graphPost(`/me/messages/${encodeURIComponent(draft.id)}/send`, undefined, args.account_id)
         return actionResponse(
           `Email scheduled for ${args.send_at}. It will be sent automatically by Exchange.\nTo cancel before send time, delete draft ID: ${draft.id}`,
           { scheduled: true, send_at: args.send_at, id: draft.id, to: args.to, subject: args.subject },
         )
       }
 
-      await client.graphPost('/me/sendMail', { message })
+      await client.graphPost('/me/sendMail', { message }, args.account_id)
       return actionResponse(
         `Email sent successfully to ${args.to.join(', ')}.`,
         { sent: true, to: args.to, subject: args.subject },
@@ -336,6 +347,7 @@ export function registerEmailTools(server: McpServer, client: GraphClient) {
           .string()
           .optional()
           .describe('Schedule send time in ISO 8601 UTC format (e.g., "2026-04-08T13:00:00Z" for 9am EST). If provided, Exchange holds the email and sends it at the specified time. Convert user timezone to UTC before passing.'),
+        account_id: accountIdField,
       }),
       annotations: {
         readOnlyHint: false,
@@ -347,14 +359,18 @@ export function registerEmailTools(server: McpServer, client: GraphClient) {
     async (args) => {
       // If scheduling, set the deferred send time property first
       if (args.send_at) {
-        await client.graphPatch(`/me/messages/${encodeURIComponent(args.id)}`, {
-          singleValueExtendedProperties: [
-            { id: 'SystemTime 0x3FEF', value: args.send_at },
-          ],
-        })
+        await client.graphPatch(
+          `/me/messages/${encodeURIComponent(args.id)}`,
+          {
+            singleValueExtendedProperties: [
+              { id: 'SystemTime 0x3FEF', value: args.send_at },
+            ],
+          },
+          args.account_id,
+        )
       }
 
-      await client.graphPost(`/me/messages/${encodeURIComponent(args.id)}/send`)
+      await client.graphPost(`/me/messages/${encodeURIComponent(args.id)}/send`, undefined, args.account_id)
 
       if (args.send_at) {
         return actionResponse(
@@ -392,6 +408,7 @@ export function registerEmailTools(server: McpServer, client: GraphClient) {
           .enum(['low', 'normal', 'high'])
           .optional()
           .describe('Email importance level.'),
+        account_id: accountIdField,
       }),
       annotations: {
         readOnlyHint: false,
@@ -422,7 +439,7 @@ export function registerEmailTools(server: McpServer, client: GraphClient) {
         ...(args.importance ? { importance: args.importance } : {}),
       }
 
-      const result = (await client.graphPost('/me/messages', draft)) as { id: string }
+      const result = (await client.graphPost('/me/messages', draft, args.account_id)) as { id: string }
       return actionResponse(
         `Draft created successfully. ID: ${result.id}`,
         { created: true, id: result.id },
@@ -445,6 +462,7 @@ export function registerEmailTools(server: McpServer, client: GraphClient) {
         is_read: z
           .boolean()
           .describe('Set to true to mark as read, false for unread.'),
+        account_id: accountIdField,
       }),
       annotations: {
         readOnlyHint: false,
@@ -456,9 +474,11 @@ export function registerEmailTools(server: McpServer, client: GraphClient) {
     async (args) => {
       const results = await Promise.allSettled(
         args.ids.map((id) =>
-          client.graphPatch(`/me/messages/${encodeURIComponent(id)}`, {
-            isRead: args.is_read,
-          }),
+          client.graphPatch(
+            `/me/messages/${encodeURIComponent(id)}`,
+            { isRead: args.is_read },
+            args.account_id,
+          ),
         ),
       )
 

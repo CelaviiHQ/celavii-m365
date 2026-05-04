@@ -5,6 +5,11 @@ import type { DriveItem, SharingLink } from '../types.js'
 import { ONEDRIVE_SELECT_FIELDS, UPLOAD_THRESHOLD } from '../types.js'
 import { formatDriveItem, formatFileSize, textResponse, paginatedResponse, actionResponse } from '../utils/formatting.js'
 
+const accountIdField = z
+  .string()
+  .optional()
+  .describe('Email/UPN of the M365 account to target. Defaults to the configured default account.')
+
 export function registerOneDriveTools(server: McpServer, client: GraphClient) {
   // ─── List Files ──────────────────────────────────────────────────────
 
@@ -30,6 +35,7 @@ export function registerOneDriveTools(server: McpServer, client: GraphClient) {
           .enum(['text', 'json'])
           .optional()
           .describe("Output format: 'text' for human-readable (default), 'json' for structured data."),
+        account_id: accountIdField,
       }),
       annotations: {
         readOnlyHint: true,
@@ -52,6 +58,7 @@ export function registerOneDriveTools(server: McpServer, client: GraphClient) {
           $orderby: 'name asc',
         },
         count,
+        args.account_id,
       )) as DriveItem[]
 
       if (items.length === 0) {
@@ -82,6 +89,7 @@ export function registerOneDriveTools(server: McpServer, client: GraphClient) {
           .enum(['text', 'json'])
           .optional()
           .describe("Output format: 'text' for human-readable (default), 'json' for structured data."),
+        account_id: accountIdField,
       }),
       annotations: {
         readOnlyHint: true,
@@ -99,6 +107,7 @@ export function registerOneDriveTools(server: McpServer, client: GraphClient) {
           $top: String(count),
           $select: ONEDRIVE_SELECT_FIELDS,
         },
+        args.account_id,
       )) as { value: DriveItem[] }
 
       const items = result.value || []
@@ -121,6 +130,7 @@ export function registerOneDriveTools(server: McpServer, client: GraphClient) {
         'Get a pre-authenticated temporary download URL for a OneDrive file. The URL expires after a short time. Use the item ID from m365_onedrive_list or m365_onedrive_search.',
       inputSchema: z.object({
         id: z.string().describe('The file item ID (from m365_onedrive_list or m365_onedrive_search).'),
+        account_id: accountIdField,
       }),
       annotations: {
         readOnlyHint: true,
@@ -132,6 +142,7 @@ export function registerOneDriveTools(server: McpServer, client: GraphClient) {
     async (args) => {
       const url = await client.graphGetDownloadUrl(
         `/me/drive/items/${encodeURIComponent(args.id)}/content`,
+        args.account_id,
       )
 
       if (!url) {
@@ -160,6 +171,7 @@ export function registerOneDriveTools(server: McpServer, client: GraphClient) {
           .string()
           .optional()
           .describe('MIME type of the file (e.g., "application/pdf"). Auto-detected if omitted.'),
+        account_id: accountIdField,
       }),
       annotations: {
         readOnlyHint: false,
@@ -169,7 +181,8 @@ export function registerOneDriveTools(server: McpServer, client: GraphClient) {
       },
     },
     async (args) => {
-      const token = await client['tokenStore'].getGraphToken()
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const token = await (client as any).tokenStore.getGraphToken(args.account_id)
       const url = `https://graph.microsoft.com/v1.0/me/drive/root:${args.path}:/content`
 
       const res = await fetch(url, {
@@ -211,6 +224,7 @@ export function registerOneDriveTools(server: McpServer, client: GraphClient) {
           .enum(['anonymous', 'organization'])
           .optional()
           .describe('Link scope: anonymous (anyone with the link) or organization. Defaults to anonymous.'),
+        account_id: accountIdField,
       }),
       annotations: {
         readOnlyHint: false,
@@ -226,6 +240,7 @@ export function registerOneDriveTools(server: McpServer, client: GraphClient) {
           type: args.type || 'view',
           scope: args.scope || 'anonymous',
         },
+        args.account_id,
       )) as SharingLink
 
       return actionResponse(
@@ -248,6 +263,7 @@ export function registerOneDriveTools(server: McpServer, client: GraphClient) {
           .string()
           .optional()
           .describe('Parent folder path (e.g., "/Documents"). Defaults to root.'),
+        account_id: accountIdField,
       }),
       annotations: {
         readOnlyHint: false,
@@ -261,11 +277,15 @@ export function registerOneDriveTools(server: McpServer, client: GraphClient) {
         ? `/me/drive/root:${args.parent_path}:/children`
         : '/me/drive/root/children'
 
-      const result = (await client.graphPost(parentPath, {
-        name: args.name,
-        folder: {},
-        '@microsoft.graph.conflictBehavior': 'rename',
-      })) as DriveItem
+      const result = (await client.graphPost(
+        parentPath,
+        {
+          name: args.name,
+          folder: {},
+          '@microsoft.graph.conflictBehavior': 'rename',
+        },
+        args.account_id,
+      )) as DriveItem
 
       return actionResponse(
         `Folder "${result.name}" created.\nURL: ${result.webUrl}\nID: ${result.id}`,
@@ -283,6 +303,7 @@ export function registerOneDriveTools(server: McpServer, client: GraphClient) {
       description: 'Permanently delete a file or folder from Microsoft 365 OneDrive. This action cannot be undone. Use the item ID from m365_onedrive_list.',
       inputSchema: z.object({
         id: z.string().describe('The item ID to delete.'),
+        account_id: accountIdField,
       }),
       annotations: {
         readOnlyHint: false,
@@ -292,7 +313,7 @@ export function registerOneDriveTools(server: McpServer, client: GraphClient) {
       },
     },
     async (args) => {
-      await client.graphDelete(`/me/drive/items/${encodeURIComponent(args.id)}`)
+      await client.graphDelete(`/me/drive/items/${encodeURIComponent(args.id)}`, args.account_id)
       return actionResponse('Item deleted successfully.', { deleted: true, id: args.id })
     },
   )

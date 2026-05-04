@@ -4,6 +4,11 @@ import type { GraphClient } from '../client.js'
 import type { InboxRule } from '../types.js'
 import { textResponse, jsonResponse, actionResponse } from '../utils/formatting.js'
 
+const accountIdField = z
+  .string()
+  .optional()
+  .describe('Email/UPN of the M365 account to target. Defaults to the configured default account.')
+
 export function registerRuleTools(server: McpServer, client: GraphClient) {
   // ─── List Rules ──────────────────────────────────────────────────────
 
@@ -17,6 +22,7 @@ export function registerRuleTools(server: McpServer, client: GraphClient) {
           .boolean()
           .optional()
           .describe('If true, return full conditions and actions for each rule as JSON.'),
+        account_id: accountIdField,
       }),
       annotations: {
         readOnlyHint: true,
@@ -26,7 +32,12 @@ export function registerRuleTools(server: McpServer, client: GraphClient) {
       },
     },
     async (args) => {
-      const rules = (await client.graphGetPaginated('/me/mailFolders/inbox/messageRules')) as InboxRule[]
+      const rules = (await client.graphGetPaginated(
+        '/me/mailFolders/inbox/messageRules',
+        undefined,
+        50,
+        args.account_id,
+      )) as InboxRule[]
 
       if (rules.length === 0) {
         return textResponse('No inbox rules found.')
@@ -91,6 +102,7 @@ export function registerRuleTools(server: McpServer, client: GraphClient) {
           .boolean()
           .optional()
           .describe('Stop processing more rules after this one matches. Defaults to false.'),
+        account_id: accountIdField,
       }),
       annotations: {
         readOnlyHint: false,
@@ -133,6 +145,7 @@ export function registerRuleTools(server: McpServer, client: GraphClient) {
       const result = (await client.graphPost(
         '/me/mailFolders/inbox/messageRules',
         rule,
+        args.account_id,
       )) as InboxRule
 
       return actionResponse(
@@ -156,6 +169,7 @@ export function registerRuleTools(server: McpServer, client: GraphClient) {
           .int()
           .min(1)
           .describe('New sequence number (lower = runs first).'),
+        account_id: accountIdField,
       }),
       annotations: {
         readOnlyHint: false,
@@ -168,6 +182,7 @@ export function registerRuleTools(server: McpServer, client: GraphClient) {
       await client.graphPatch(
         `/me/mailFolders/inbox/messageRules/${encodeURIComponent(args.id)}`,
         { sequence: args.sequence },
+        args.account_id,
       )
       return actionResponse(
         `Rule sequence updated to ${args.sequence}.`,
@@ -185,6 +200,7 @@ export function registerRuleTools(server: McpServer, client: GraphClient) {
       description: 'Permanently delete an inbox rule from Microsoft 365. This action cannot be undone.',
       inputSchema: z.object({
         id: z.string().describe('The rule ID to delete.'),
+        account_id: accountIdField,
       }),
       annotations: {
         readOnlyHint: false,
@@ -196,6 +212,7 @@ export function registerRuleTools(server: McpServer, client: GraphClient) {
     async (args) => {
       await client.graphDelete(
         `/me/mailFolders/inbox/messageRules/${encodeURIComponent(args.id)}`,
+        args.account_id,
       )
       return actionResponse('Rule deleted.', { deleted: true, id: args.id })
     },

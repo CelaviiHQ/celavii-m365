@@ -5,6 +5,11 @@ import type { MailFolder } from '../types.js'
 import { textResponse, actionResponse, batchResponse } from '../utils/formatting.js'
 import { resolveMailFolder } from '../utils/folders.js'
 
+const accountIdField = z
+  .string()
+  .optional()
+  .describe('Email/UPN of the M365 account to target. Defaults to the configured default account.')
+
 export function registerFolderTools(server: McpServer, client: GraphClient) {
   // ─── List Folders ────────────────────────────────────────────────────
 
@@ -23,6 +28,7 @@ export function registerFolderTools(server: McpServer, client: GraphClient) {
           .enum(['text', 'json'])
           .optional()
           .describe("Output format: 'text' for human-readable (default), 'json' for structured data."),
+        account_id: accountIdField,
       }),
       annotations: {
         readOnlyHint: true,
@@ -36,9 +42,12 @@ export function registerFolderTools(server: McpServer, client: GraphClient) {
         ? `${resolveMailFolder(args.parent_folder)}/childFolders`
         : '/me/mailFolders'
 
-      const folders = (await client.graphGetPaginated(path, {
-        $top: '100',
-      })) as MailFolder[]
+      const folders = (await client.graphGetPaginated(
+        path,
+        { $top: '100' },
+        50,
+        args.account_id,
+      )) as MailFolder[]
 
       if (folders.length === 0) {
         return textResponse('No folders found.')
@@ -91,6 +100,7 @@ export function registerFolderTools(server: McpServer, client: GraphClient) {
           .string()
           .optional()
           .describe('Parent folder name or ID. Defaults to top-level.'),
+        account_id: accountIdField,
       }),
       annotations: {
         readOnlyHint: false,
@@ -104,9 +114,11 @@ export function registerFolderTools(server: McpServer, client: GraphClient) {
         ? `${resolveMailFolder(args.parent_folder)}/childFolders`
         : '/me/mailFolders'
 
-      const result = (await client.graphPost(path, {
-        displayName: args.name,
-      })) as MailFolder
+      const result = (await client.graphPost(
+        path,
+        { displayName: args.name },
+        args.account_id,
+      )) as MailFolder
 
       return actionResponse(
         `Folder "${result.displayName}" created successfully.\nID: ${result.id}`,
@@ -129,6 +141,7 @@ export function registerFolderTools(server: McpServer, client: GraphClient) {
         destination_folder: z
           .string()
           .describe('Destination folder name (inbox, sent, drafts, deleted, junk, archive) or folder ID.'),
+        account_id: accountIdField,
       }),
       annotations: {
         readOnlyHint: false,
@@ -144,15 +157,19 @@ export function registerFolderTools(server: McpServer, client: GraphClient) {
       if (wellKnown.includes(args.destination_folder.toLowerCase())) {
         const folder = (await client.graphGet(
           resolveMailFolder(args.destination_folder),
+          undefined,
+          args.account_id,
         )) as MailFolder
         destinationId = folder.id
       }
 
       const results = await Promise.allSettled(
         args.ids.map((id) =>
-          client.graphPost(`/me/messages/${encodeURIComponent(id)}/move`, {
-            destinationId,
-          }),
+          client.graphPost(
+            `/me/messages/${encodeURIComponent(id)}/move`,
+            { destinationId },
+            args.account_id,
+          ),
         ),
       )
 

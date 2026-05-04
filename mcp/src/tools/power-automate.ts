@@ -4,6 +4,11 @@ import type { GraphClient } from '../client.js'
 import type { FlowEnvironment, Flow, FlowRun } from '../types.js'
 import { textResponse, actionResponse } from '../utils/formatting.js'
 
+const accountIdField = z
+  .string()
+  .optional()
+  .describe('Email/UPN of the M365 account to target. Defaults to the configured default account.')
+
 export function registerPowerAutomateTools(server: McpServer, client: GraphClient) {
   // ─── List Environments ───────────────────────────────────────────────
 
@@ -17,6 +22,7 @@ export function registerPowerAutomateTools(server: McpServer, client: GraphClien
           .enum(['text', 'json'])
           .optional()
           .describe("Output format: 'text' for human-readable (default), 'json' for structured data."),
+        account_id: accountIdField,
       }),
       annotations: {
         readOnlyHint: true,
@@ -28,6 +34,7 @@ export function registerPowerAutomateTools(server: McpServer, client: GraphClien
     async (args) => {
       const result = (await client.flowGet(
         '/providers/Microsoft.ProcessSimple/environments?api-version=2016-11-01',
+        args.account_id,
       )) as { value: FlowEnvironment[] }
 
       const envs = result.value || []
@@ -79,6 +86,7 @@ export function registerPowerAutomateTools(server: McpServer, client: GraphClien
           .enum(['text', 'json'])
           .optional()
           .describe("Output format: 'text' for human-readable (default), 'json' for structured data."),
+        account_id: accountIdField,
       }),
       annotations: {
         readOnlyHint: true,
@@ -91,6 +99,7 @@ export function registerPowerAutomateTools(server: McpServer, client: GraphClien
       const envId = encodeURIComponent(args.environment_id)
       const result = (await client.flowGet(
         `/providers/Microsoft.ProcessSimple/environments/${envId}/flows?api-version=2016-11-01`,
+        args.account_id,
       )) as { value: Flow[] }
 
       const flows = result.value || []
@@ -146,6 +155,7 @@ export function registerPowerAutomateTools(server: McpServer, client: GraphClien
           .record(z.unknown())
           .optional()
           .describe('Optional input parameters for the flow trigger (key-value pairs).'),
+        account_id: accountIdField,
       }),
       annotations: {
         readOnlyHint: false,
@@ -161,6 +171,7 @@ export function registerPowerAutomateTools(server: McpServer, client: GraphClien
       await client.flowPost(
         `/providers/Microsoft.ProcessSimple/environments/${envId}/flows/${flowId}/triggers/manual/run?api-version=2016-11-01`,
         args.inputs || {},
+        args.account_id,
       )
 
       return actionResponse('Flow triggered successfully.', { triggered: true, flowId: args.flow_id })
@@ -188,6 +199,7 @@ export function registerPowerAutomateTools(server: McpServer, client: GraphClien
           .enum(['text', 'json'])
           .optional()
           .describe("Output format: 'text' for human-readable (default), 'json' for structured data."),
+        account_id: accountIdField,
       }),
       annotations: {
         readOnlyHint: true,
@@ -203,6 +215,7 @@ export function registerPowerAutomateTools(server: McpServer, client: GraphClien
 
       const result = (await client.flowGet(
         `/providers/Microsoft.ProcessSimple/environments/${envId}/flows/${flowId}/runs?api-version=2016-11-01&$top=${top}`,
+        args.account_id,
       )) as { value: FlowRun[] }
 
       const runs = result.value || []
@@ -261,6 +274,7 @@ export function registerPowerAutomateTools(server: McpServer, client: GraphClien
         enabled: z
           .boolean()
           .describe('Set to true to enable, false to disable the flow.'),
+        account_id: accountIdField,
       }),
       annotations: {
         readOnlyHint: false,
@@ -276,6 +290,8 @@ export function registerPowerAutomateTools(server: McpServer, client: GraphClien
 
       await client.flowPost(
         `/providers/Microsoft.ProcessSimple/environments/${envId}/flows/${flowId}/${action}?api-version=2016-11-01`,
+        undefined,
+        args.account_id,
       )
 
       return actionResponse(
